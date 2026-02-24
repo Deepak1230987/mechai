@@ -49,16 +49,7 @@ Async:
 - Async job processing for heavy CAD tasks
 - Signed URLs for file uploads
 
-# Current Phase
 
-Phase 1:
-- Auth
-- User Panel
-- Vendor Panel
-- Admin Panel
-- CAD Upload
-- Viewer
-- Model Listing
 
 # Code Generation Rules
 
