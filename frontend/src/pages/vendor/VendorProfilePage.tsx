@@ -50,9 +50,9 @@ export function VendorProfilePage() {
         </Badge>
       </PageHeader>
 
-      <Card className="max-w-2xl">
+      <Card className="max-w-2xl border-border bg-card">
         <CardHeader>
-          <CardTitle>Company Information</CardTitle>
+          <CardTitle className="text-base font-semibold">Company Information</CardTitle>
           <CardDescription>
             Update your manufacturing capabilities to receive relevant RFQs.
           </CardDescription>
@@ -60,17 +60,18 @@ export function VendorProfilePage() {
         <CardContent>
           <form onSubmit={handleSubmit} className="space-y-4">
             <div className="space-y-2">
-              <Label htmlFor="company-name">Company Name</Label>
+              <Label htmlFor="company-name" className="text-sm font-medium">Company Name</Label>
               <Input
                 id="company-name"
                 value={companyName}
                 onChange={(e) => setCompanyName(e.target.value)}
                 required
+                className="bg-input border-border"
               />
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="machines">
+              <Label htmlFor="machines" className="text-sm font-medium">
                 Machines{" "}
                 <span className="text-muted-foreground text-xs">
                   (comma-separated)
@@ -82,11 +83,12 @@ export function VendorProfilePage() {
                 onChange={(e) => setMachines(e.target.value)}
                 placeholder="3-Axis CNC, 5-Axis CNC, CNC Lathe"
                 rows={2}
+                className="bg-input border-border"
               />
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="materials">
+              <Label htmlFor="materials" className="text-sm font-medium">
                 Materials Supported{" "}
                 <span className="text-muted-foreground text-xs">
                   (comma-separated)
@@ -98,26 +100,29 @@ export function VendorProfilePage() {
                 onChange={(e) => setMaterials(e.target.value)}
                 placeholder="Aluminum 6061, Steel 304, Titanium"
                 rows={2}
+                className="bg-input border-border"
               />
             </div>
 
             <div className="grid gap-4 sm:grid-cols-2">
               <div className="space-y-2">
-                <Label htmlFor="max-part-size">Max Part Size</Label>
+                <Label htmlFor="max-part-size" className="text-sm font-medium">Max Part Size</Label>
                 <Input
                   id="max-part-size"
                   value={maxPartSize}
                   onChange={(e) => setMaxPartSize(e.target.value)}
                   placeholder="500x500x300 mm"
+                  className="bg-input border-border"
                 />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="tolerance">Tolerance Capability</Label>
+                <Label htmlFor="tolerance" className="text-sm font-medium">Tolerance Capability</Label>
                 <Input
                   id="tolerance"
                   value={tolerance}
                   onChange={(e) => setTolerance(e.target.value)}
                   placeholder="±0.01 mm"
+                  className="bg-input border-border"
                 />
               </div>
             </div>
@@ -132,7 +137,7 @@ export function VendorProfilePage() {
                 Save Profile
               </Button>
               {saved && (
-                <span className="text-sm text-green-600">
+                <span className="text-sm text-emerald-400">
                   Profile saved successfully!
                 </span>
               )}

@@ -31,22 +31,51 @@ async def start_subscriber() -> None:
 async def _start_pubsub_subscriber() -> None:
     """
     Production Pub/Sub subscriber.
-    Placeholder — will use google.cloud.pubsub_v1.SubscriberClient.
+    Subscribes to the GCP Pub/Sub topic and processes messages.
     """
-    # from google.cloud import pubsub_v1
-    # subscriber = pubsub_v1.SubscriberClient()
-    # subscription_path = subscriber.subscription_path(
-    #     settings.GCP_PROJECT_ID, settings.PUBSUB_SUBSCRIPTION
-    # )
-    #
-    # def callback(message):
-    #     data = json.loads(message.data.decode("utf-8"))
-    #     asyncio.run(process_model(data["model_id"], data["gcs_path"]))
-    #     message.ack()
-    #
-    # streaming_pull_future = subscriber.subscribe(subscription_path, callback=callback)
-    # streaming_pull_future.result()
-    raise NotImplementedError("Production Pub/Sub subscriber not configured yet")
+    from google.cloud import pubsub_v1
+    from concurrent.futures import TimeoutError as FuturesTimeout
+
+    subscriber = pubsub_v1.SubscriberClient()
+    subscription_path = subscriber.subscription_path(
+        settings.GCP_PROJECT_ID, settings.PUBSUB_SUBSCRIPTION
+    )
+
+    logger.info(f"Subscribing to {subscription_path}...")
+
+    def callback(message: pubsub_v1.subscriber.message.Message) -> None:
+        try:
+            data = json.loads(message.data.decode("utf-8"))
+            model_id = data.get("model_id", "")
+            gcs_path = data.get("gcs_path", "")
+            logger.info(f"Received Pub/Sub message for model {model_id}")
+
+            # Run the async processor in a new event loop
+            # (callback runs in a thread managed by the subscriber)
+            loop = asyncio.new_event_loop()
+            try:
+                loop.run_until_complete(process_model(model_id, gcs_path))
+            finally:
+                loop.close()
+
+            message.ack()
+            logger.info(f"Message acknowledged for model {model_id}")
+        except Exception as e:
+            logger.error(f"Error processing Pub/Sub message: {e}")
+            message.nack()
+
+    streaming_pull_future = subscriber.subscribe(subscription_path, callback=callback)
+    logger.info("Pub/Sub subscriber started — listening for messages...")
+
+    # Block indefinitely, handling messages via the callback
+    try:
+        streaming_pull_future.result()
+    except FuturesTimeout:
+        streaming_pull_future.cancel()
+        streaming_pull_future.result()
+    except KeyboardInterrupt:
+        streaming_pull_future.cancel()
+        logger.info("Pub/Sub subscriber stopped.")
 
 
 async def _start_db_poller() -> None:

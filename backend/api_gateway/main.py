@@ -22,8 +22,9 @@ Future:
 import logging
 import sys
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 
 from shared.config import get_settings
 from api_gateway.routes import gateway_router
@@ -43,7 +44,11 @@ app = FastAPI(
     docs_url="/docs",
 )
 
-# ── CORS ──────────────────────────────────────────────────────────────────────
+# ── Middleware (added in reverse order — last added = outermost) ──────────────
+# Logging runs inside CORS so CORS headers are always applied, even on errors
+app.add_middleware(RequestLoggingMiddleware)
+
+# CORS must be outermost so preflight OPTIONS and error responses get headers
 app.add_middleware(
     CORSMiddleware,
     allow_origins=settings.CORS_ORIGINS,
@@ -52,11 +57,19 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# ── Logging middleware ────────────────────────────────────────────────────────
-app.add_middleware(RequestLoggingMiddleware)
-
 # ── Routes ────────────────────────────────────────────────────────────────────
 app.include_router(gateway_router, prefix="/api/v1")
+
+
+# ── Exception handler (inside CORS layer, so CORS headers are always added) ──
+@app.exception_handler(Exception)
+async def global_exception_handler(request: Request, exc: Exception):
+    logger = logging.getLogger("api_gateway")
+    logger.exception("Unhandled exception on %s %s", request.method, request.url.path)
+    return JSONResponse(
+        status_code=500,
+        content={"detail": "Internal server error"},
+    )
 
 
 @app.get("/health")

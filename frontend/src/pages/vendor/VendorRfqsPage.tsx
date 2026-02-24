@@ -21,7 +21,7 @@ export function VendorRfqsPage() {
         description="Review and submit quotes for incoming requests."
       />
 
-      <Card>
+      <Card className="border-border bg-card">
         <CardContent className="p-0">
           <Table>
             <TableHeader>

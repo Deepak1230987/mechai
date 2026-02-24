@@ -1,30 +1,32 @@
-# ══════════════════════════════════════════════════════════════════════════════
-# AI-CAM-RFQ Platform — Backend Dependencies
-# ══════════════════════════════════════════════════════════════════════════════
+# AI-CAM-RFQ Platform - Backend Dependencies
 
-# ── Core Framework ────────────────────────────────────────────────────────────
+# Core Framework
 fastapi==0.115.6
 uvicorn[standard]==0.34.0
 pydantic==2.10.4
 pydantic-settings==2.7.1
 
-# ── Database ──────────────────────────────────────────────────────────────────
+# Database
 sqlalchemy[asyncio]==2.0.36
 asyncpg==0.30.0
 alembic==1.14.1
 greenlet==3.1.1
 
-# ── Auth / Security ──────────────────────────────────────────────────────────
+# Auth / Security
 python-jose[cryptography]==3.3.0
 passlib[bcrypt]==1.7.4
 pydantic[email]
 
-# ── HTTP Client (API Gateway proxy) ──────────────────────────────────────────
+# HTTP Client (API Gateway proxy)
 httpx==0.28.1
 
-# ── GCP (placeholder — uncomment when deploying to GCP) ──────────────────────
-# google-cloud-storage==2.18.2
-# google-cloud-pubsub==2.27.1
+# CAD Processing
+trimesh==4.4.1
+numpy==1.26.4
 
-# ── Dev / Testing ────────────────────────────────────────────────────────────
+# GCP (lazy-imported at runtime when ENV=production)
+google-cloud-storage==2.18.2
+google-cloud-pubsub==2.27.1
+
+# Dev / Testing
 python-dotenv==1.0.1

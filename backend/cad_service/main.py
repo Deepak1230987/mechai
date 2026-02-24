@@ -16,7 +16,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from shared.config import get_settings
-from cad_service.routes import models_router
+from cad_service.routes import models_router, dev_files_router
 
 settings = get_settings()
 
@@ -36,6 +36,10 @@ app.add_middleware(
 )
 
 app.include_router(models_router, prefix="/models", tags=["Models"])
+
+# Dev-only endpoints for local file upload & serving (replaces GCS signed URLs)
+if settings.ENV != "production":
+    app.include_router(dev_files_router)
 
 
 @app.get("/health")

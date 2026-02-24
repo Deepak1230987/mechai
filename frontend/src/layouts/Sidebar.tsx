@@ -38,20 +38,25 @@ export function Sidebar({ onNavigate }: SidebarProps) {
 
   return (
     <div className="flex h-full flex-col bg-sidebar text-sidebar-foreground">
-      {/* Logo / Brand */}
-      <div className="flex h-14 items-center border-b border-sidebar-border px-4">
+      {/* Brand */}
+      <div className="flex h-16 items-center border-b border-sidebar-border px-5">
         <Link
           to="/"
-          className="flex items-center gap-2 font-semibold text-lg"
+          className="flex items-center gap-2.5 font-semibold text-base tracking-tight"
           onClick={onNavigate}
         >
-          <Box className="h-6 w-6 text-sidebar-primary" />
+          <div className="flex h-8 w-8 items-center justify-center rounded-md bg-primary">
+            <Box className="h-4 w-4 text-primary-foreground" />
+          </div>
           <span>AI-CAM-RFQ</span>
         </Link>
       </div>
 
       {/* Navigation */}
-      <nav className="flex-1 space-y-1 p-3">
+      <nav className="flex-1 space-y-0.5 px-3 py-4">
+        <p className="mb-2 px-3 text-[11px] font-semibold uppercase tracking-wider text-sidebar-foreground/40">
+          Navigation
+        </p>
         {navItems.map((item) => {
           const Icon = iconMap[item.icon] ?? LayoutDashboard;
           const isActive =
@@ -68,16 +73,22 @@ export function Sidebar({ onNavigate }: SidebarProps) {
               to={item.href}
               onClick={onNavigate}
               className={cn(
-                "flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-colors",
+                "relative flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-colors",
                 isActive
-                  ? "bg-sidebar-accent text-sidebar-accent-foreground"
-                  : "text-sidebar-foreground/70 hover:bg-sidebar-accent/50 hover:text-sidebar-accent-foreground",
+                  ? "bg-primary/10 text-primary"
+                  : "text-sidebar-foreground/60 hover:bg-sidebar-accent hover:text-sidebar-foreground",
               )}
             >
+              {isActive && (
+                <span className="absolute left-0 top-1/2 -translate-y-1/2 h-5 w-0.75 rounded-r-sm bg-primary" />
+              )}
               <Icon className="h-4 w-4 shrink-0" />
               <span className="flex-1">{item.title}</span>
               {item.badge && (
-                <Badge variant="secondary" className="ml-auto text-xs">
+                <Badge
+                  variant="secondary"
+                  className="ml-auto h-5 min-w-5 justify-center rounded px-1.5 text-[10px] font-semibold"
+                >
                   {item.badge}
                 </Badge>
               )}
@@ -87,9 +98,9 @@ export function Sidebar({ onNavigate }: SidebarProps) {
       </nav>
 
       {/* Footer */}
-      <div className="border-t border-sidebar-border p-3">
-        <div className="flex items-center gap-2 px-3 py-2 text-xs text-sidebar-foreground/50">
-          <Settings className="h-3.5 w-3.5" />
+      <div className="border-t border-sidebar-border px-5 py-3">
+        <div className="flex items-center gap-2 text-[11px] text-sidebar-foreground/40">
+          <Settings className="h-3 w-3" />
           <span>v0.1.0 — Phase 1</span>
         </div>
       </div>

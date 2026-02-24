@@ -4,7 +4,7 @@ import axios, { type AxiosError, type InternalAxiosRequestConfig } from "axios";
 
 const api = axios.create({
     baseURL: import.meta.env.VITE_API_BASE_URL || "http://localhost:8000/api/v1",
-    timeout: 15000,
+    timeout: 30000,
     headers: {
         "Content-Type": "application/json",
     },
@@ -29,14 +29,18 @@ api.interceptors.request.use(
 
 api.interceptors.response.use(
     (response) => response,
-    (error: AxiosError) => {
+    (error: AxiosError<{ detail?: string }>) => {
         if (error.response) {
             const { status } = error.response;
 
             if (status === 401) {
                 // Token expired or invalid — clear auth and redirect
                 localStorage.removeItem("token");
-                window.location.href = "/login";
+                // Only redirect if not already on auth pages
+                if (!window.location.pathname.startsWith("/login") &&
+                    !window.location.pathname.startsWith("/register")) {
+                    window.location.href = "/login";
+                }
             }
 
             if (status === 403) {
@@ -46,8 +50,14 @@ api.interceptors.response.use(
             if (status >= 500) {
                 console.error("Server error — please try again later");
             }
+
+            // Surface the backend error message
+            const detail = error.response.data?.detail;
+            if (detail) {
+                error.message = detail;
+            }
         } else if (error.request) {
-            console.error("Network error — no response received");
+            error.message = "Network error — server may be unavailable";
         }
 
         return Promise.reject(error);

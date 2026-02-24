@@ -48,7 +48,7 @@ async def proxy_request(
     body = await request.body()
 
     # Build query string
-    query = str(request.query_string, "utf-8") if request.query_string else None
+    query = request.url.query
     if query:
         url = f"{url}?{query}"
 

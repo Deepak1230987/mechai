@@ -30,16 +30,60 @@ export interface RegisterCredentials {
 
 // ─── Models ──────────────────────────────────────────────────────────────────
 
-export type ModelStatus = "UPLOADED" | "PROCESSING" | "READY";
+export type ModelStatus = "UPLOADED" | "PROCESSING" | "READY" | "FAILED";
 export type ModelVisibility = "PRIVATE" | "PUBLIC";
 
 export interface Model {
     id: string;
+    user_id: string;
     name: string;
+    original_filename: string;
+    file_format: string;
     version: number;
     status: ModelStatus;
     visibility: ModelVisibility;
-    createdAt: string;
+    created_at: string;
+}
+
+// ─── API Request / Response Types ────────────────────────────────────────────
+
+export interface UploadRequest {
+    filename: string;
+    file_format: string;
+    name?: string;
+}
+
+export interface UploadResponse {
+    model_id: string;
+    signed_url: string;
+    gcs_path: string;
+}
+
+export interface ConfirmUploadRequest {
+    model_id: string;
+}
+
+export interface ModelListResponse {
+    models: Model[];
+    total: number;
+}
+
+export interface ViewerUrlResponse {
+    model_id: string;
+    gltf_url: string;
+    expires_in_seconds: number;
+}
+
+export interface TokenResponse {
+    access_token: string;
+    token_type: string;
+    user: {
+        id: string;
+        email: string;
+        name: string;
+        role: UserRole;
+        created_at: string;
+    };
 }
 
 // ─── Vendor ──────────────────────────────────────────────────────────────────

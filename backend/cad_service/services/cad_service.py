@@ -41,37 +41,48 @@ ALLOWED_FORMATS = {"STEP", "IGES", "STL", "PARASOLID"}
 
 def _generate_signed_upload_url(gcs_path: str) -> str:
     """
-    Generate a signed upload URL for GCS.
+    Generate a signed upload URL.
 
-    In production, use google.cloud.storage.Client to generate a real signed URL.
-    For local development, return a placeholder URL.
+    Production: GCS v4 signed URL (15-min expiry, PUT method).
+    Development: local dev endpoint on CAD Service.
     """
     if settings.ENV == "production":
-        # Production implementation would use:
-        # from google.cloud import storage
-        # client = storage.Client(project=settings.GCP_PROJECT_ID)
-        # bucket = client.bucket(settings.GCS_BUCKET_NAME)
-        # blob = bucket.blob(gcs_path)
-        # url = blob.generate_signed_url(
-        #     version="v4",
-        #     expiration=timedelta(minutes=15),
-        #     method="PUT",
-        #     content_type="application/octet-stream",
-        # )
-        # return url
-        raise NotImplementedError("Production GCS not configured yet")
+        from google.cloud import storage
 
-    # Dev placeholder — in dev mode, the frontend can POST the file to a local endpoint
+        client = storage.Client(project=settings.GCP_PROJECT_ID)
+        bucket = client.bucket(settings.GCS_BUCKET_NAME)
+        blob = bucket.blob(gcs_path)
+        url = blob.generate_signed_url(
+            version="v4",
+            expiration=timedelta(minutes=15),
+            method="PUT",
+            content_type="application/octet-stream",
+        )
+        return url
+
+    # Dev: frontend PUTs file to the local dev endpoint
     return f"http://localhost:8002/dev/upload/{gcs_path}"
 
 
 def _generate_signed_read_url(gcs_path: str) -> str:
     """
     Generate a signed read URL for serving glTF files.
-    15-minute expiry.
+
+    Production: GCS v4 signed URL (15-min expiry, GET method).
+    Development: local dev endpoint on CAD Service.
     """
     if settings.ENV == "production":
-        raise NotImplementedError("Production GCS not configured yet")
+        from google.cloud import storage
+
+        client = storage.Client(project=settings.GCP_PROJECT_ID)
+        bucket = client.bucket(settings.GCS_BUCKET_NAME)
+        blob = bucket.blob(gcs_path)
+        url = blob.generate_signed_url(
+            version="v4",
+            expiration=timedelta(minutes=15),
+            method="GET",
+        )
+        return url
 
     return f"http://localhost:8002/dev/files/{gcs_path}"
 
@@ -80,8 +91,8 @@ async def _publish_processing_event(model_id: str, gcs_path: str) -> None:
     """
     Publish a Pub/Sub message to trigger the CAD Worker.
 
-    In production, use google.cloud.pubsub_v1.PublisherClient.
-    For local development, log the message (worker can poll DB or use a local queue).
+    Production: publishes to GCP Pub/Sub topic.
+    Development: logs the event — worker polls DB instead.
     """
     message = {
         "model_id": model_id,
@@ -90,14 +101,17 @@ async def _publish_processing_event(model_id: str, gcs_path: str) -> None:
     }
 
     if settings.ENV == "production":
-        # from google.cloud import pubsub_v1
-        # publisher = pubsub_v1.PublisherClient()
-        # topic_path = publisher.topic_path(settings.GCP_PROJECT_ID, settings.PUBSUB_TOPIC)
-        # publisher.publish(topic_path, json.dumps(message).encode("utf-8"))
-        raise NotImplementedError("Production Pub/Sub not configured yet")
+        from google.cloud import pubsub_v1
+
+        publisher = pubsub_v1.PublisherClient()
+        topic_path = publisher.topic_path(settings.GCP_PROJECT_ID, settings.PUBSUB_TOPIC)
+        future = publisher.publish(topic_path, json.dumps(message).encode("utf-8"))
+        message_id = future.result(timeout=10)
+        logger.info(f"Pub/Sub message published: {message_id} for model {model_id}")
+        return
 
     # Dev: just log it — the CAD Worker watches the DB in dev mode
-    logger.info(f"[DEV] Pub/Sub event published: {json.dumps(message)}")
+    logger.info(f"[DEV] Pub/Sub event (logged only): {json.dumps(message)}")
 
 
 # ── Service functions ─────────────────────────────────────────────────────────

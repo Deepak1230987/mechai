@@ -33,7 +33,7 @@ export function AdminVendorsPage() {
         description="Review and approve vendor registrations."
       />
 
-      <Card>
+      <Card className="border-border bg-card">
         <CardContent className="p-0">
           <Table>
             <TableHeader>

@@ -58,25 +58,29 @@ export function RegisterPage() {
 
   return (
     <div className="flex min-h-screen items-center justify-center bg-background px-4">
-      <Card className="w-full max-w-md">
-        <CardHeader className="text-center">
-          <div className="mx-auto mb-2 flex h-12 w-12 items-center justify-center rounded-lg bg-primary">
-            <Box className="h-6 w-6 text-primary-foreground" />
+      <Card className="w-full max-w-md border-border bg-card">
+        <CardHeader className="text-center pb-2">
+          <div className="mx-auto mb-4 flex h-11 w-11 items-center justify-center rounded-lg bg-primary">
+            <Box className="h-5 w-5 text-primary-foreground" />
           </div>
-          <CardTitle className="text-2xl">Create an account</CardTitle>
-          <CardDescription>
+          <CardTitle className="text-xl font-semibold">
+            Create an account
+          </CardTitle>
+          <CardDescription className="text-muted-foreground">
             Get started with the AI-CAM-RFQ Platform
           </CardDescription>
         </CardHeader>
         <form onSubmit={handleSubmit}>
-          <CardContent className="space-y-4">
+          <CardContent className="space-y-4 pt-2">
             {error && (
-              <div className="rounded-md bg-destructive/10 p-3 text-sm text-destructive">
+              <div className="rounded-md bg-destructive/10 border border-destructive/20 p-3 text-sm text-destructive">
                 {error}
               </div>
             )}
             <div className="space-y-2">
-              <Label htmlFor="name">Full Name</Label>
+              <Label htmlFor="name" className="text-sm font-medium">
+                Full Name
+              </Label>
               <Input
                 id="name"
                 type="text"
@@ -85,10 +89,13 @@ export function RegisterPage() {
                 onChange={(e) => setName(e.target.value)}
                 required
                 autoComplete="name"
+                className="bg-input border-border"
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="email">Email</Label>
+              <Label htmlFor="email" className="text-sm font-medium">
+                Email
+              </Label>
               <Input
                 id="email"
                 type="email"
@@ -97,10 +104,13 @@ export function RegisterPage() {
                 onChange={(e) => setEmail(e.target.value)}
                 required
                 autoComplete="email"
+                className="bg-input border-border"
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="password">Password</Label>
+              <Label htmlFor="password" className="text-sm font-medium">
+                Password
+              </Label>
               <Input
                 id="password"
                 type="password"
@@ -110,25 +120,28 @@ export function RegisterPage() {
                 required
                 minLength={6}
                 autoComplete="new-password"
+                className="bg-input border-border"
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="role">Account Type</Label>
+              <Label htmlFor="role" className="text-sm font-medium">
+                Account Type
+              </Label>
               <Select
                 value={role}
                 onValueChange={(v) => setRole(v as UserRole)}
               >
-                <SelectTrigger>
+                <SelectTrigger className="bg-input border-border">
                   <SelectValue placeholder="Select role" />
                 </SelectTrigger>
-                <SelectContent>
+                <SelectContent className="border-border">
                   <SelectItem value="USER">Customer</SelectItem>
                   <SelectItem value="VENDOR">Vendor / Manufacturer</SelectItem>
                 </SelectContent>
               </Select>
             </div>
           </CardContent>
-          <CardFooter className="flex flex-col gap-3">
+          <CardFooter className="flex flex-col gap-3 pt-2">
             <Button type="submit" className="w-full" disabled={isSubmitting}>
               {isSubmitting && (
                 <Loader2 className="mr-2 h-4 w-4 animate-spin" />

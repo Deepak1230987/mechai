@@ -7,36 +7,37 @@ type StatusType = ModelStatus | RfqStatus;
 const statusConfig: Record<StatusType, { label: string; className: string }> = {
   UPLOADED: {
     label: "Uploaded",
-    className: "bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-300",
+    className: "bg-blue-500/10 text-blue-400 border border-blue-500/20",
   },
   PROCESSING: {
     label: "Processing",
-    className:
-      "bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-300",
+    className: "bg-amber-500/10 text-amber-400 border border-amber-500/20",
   },
   READY: {
     label: "Ready",
     className:
-      "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300",
+      "bg-emerald-500/10 text-emerald-400 border border-emerald-500/20",
   },
   PENDING: {
     label: "Pending",
-    className:
-      "bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-300",
+    className: "bg-orange-500/10 text-orange-400 border border-orange-500/20",
   },
   QUOTED: {
     label: "Quoted",
-    className:
-      "bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-300",
+    className: "bg-violet-500/10 text-violet-400 border border-violet-500/20",
   },
   ACCEPTED: {
     label: "Accepted",
     className:
-      "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300",
+      "bg-emerald-500/10 text-emerald-400 border border-emerald-500/20",
   },
   REJECTED: {
     label: "Rejected",
-    className: "bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-300",
+    className: "bg-red-500/10 text-red-400 border border-red-500/20",
+  },
+  FAILED: {
+    label: "Failed",
+    className: "bg-red-500/10 text-red-400 border border-red-500/20",
   },
 };
 
@@ -50,7 +51,11 @@ export function StatusBadge({ status, className }: StatusBadgeProps) {
   return (
     <Badge
       variant="secondary"
-      className={cn("font-medium border-0", config.className, className)}
+      className={cn(
+        "font-medium border-0 rounded px-2 py-0.5 text-[11px]",
+        config.className,
+        className,
+      )}
     >
       {config.label}
     </Badge>

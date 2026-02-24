@@ -29,31 +29,16 @@ export function LoginPage() {
 
     try {
       await login({ email, password });
-      // After login, role is set — navigate accordingly
-      // We need to read from the token since state may not have updated yet
-      const token = localStorage.getItem("token");
-      if (token) {
-        const payload = JSON.parse(atob(token.split(".")[1]));
-        const userRole = payload.role;
-        switch (userRole) {
-          case "VENDOR":
-            navigate("/vendor");
-            break;
-          case "ADMIN":
-            navigate("/admin");
-            break;
-          default:
-            navigate("/dashboard");
-        }
-      }
     } catch (err) {
       setError(err instanceof Error ? err.message : "Login failed");
-    } finally {
       setIsSubmitting(false);
+      return;
     }
+
+    setIsSubmitting(false);
   };
 
-  // If already logged in, redirect
+  // If already logged in, redirect based on role
   if (role) {
     switch (role) {
       case "VENDOR":
@@ -69,23 +54,27 @@ export function LoginPage() {
 
   return (
     <div className="flex min-h-screen items-center justify-center bg-background px-4">
-      <Card className="w-full max-w-md">
-        <CardHeader className="text-center">
-          <div className="mx-auto mb-2 flex h-12 w-12 items-center justify-center rounded-lg bg-primary">
-            <Box className="h-6 w-6 text-primary-foreground" />
+      <Card className="w-full max-w-md border-border bg-card">
+        <CardHeader className="text-center pb-2">
+          <div className="mx-auto mb-4 flex h-11 w-11 items-center justify-center rounded-lg bg-primary">
+            <Box className="h-5 w-5 text-primary-foreground" />
           </div>
-          <CardTitle className="text-2xl">Welcome back</CardTitle>
-          <CardDescription>Sign in to the AI-CAM-RFQ Platform</CardDescription>
+          <CardTitle className="text-xl font-semibold">Welcome back</CardTitle>
+          <CardDescription className="text-muted-foreground">
+            Sign in to the AI-CAM-RFQ Platform
+          </CardDescription>
         </CardHeader>
         <form onSubmit={handleSubmit}>
-          <CardContent className="space-y-4">
+          <CardContent className="space-y-4 pt-2">
             {error && (
-              <div className="rounded-md bg-destructive/10 p-3 text-sm text-destructive">
+              <div className="rounded-md bg-destructive/10 border border-destructive/20 p-3 text-sm text-destructive">
                 {error}
               </div>
             )}
             <div className="space-y-2">
-              <Label htmlFor="email">Email</Label>
+              <Label htmlFor="email" className="text-sm font-medium">
+                Email
+              </Label>
               <Input
                 id="email"
                 type="email"
@@ -94,10 +83,13 @@ export function LoginPage() {
                 onChange={(e) => setEmail(e.target.value)}
                 required
                 autoComplete="email"
+                className="bg-input border-border"
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="password">Password</Label>
+              <Label htmlFor="password" className="text-sm font-medium">
+                Password
+              </Label>
               <Input
                 id="password"
                 type="password"
@@ -106,18 +98,11 @@ export function LoginPage() {
                 onChange={(e) => setPassword(e.target.value)}
                 required
                 autoComplete="current-password"
+                className="bg-input border-border"
               />
             </div>
-
-            {/* Demo credentials hint */}
-            <div className="rounded-md bg-muted p-3 text-xs text-muted-foreground space-y-1">
-              <p className="font-medium">Demo credentials:</p>
-              <p>User: user@example.com / password123</p>
-              <p>Vendor: vendor@example.com / password123</p>
-              <p>Admin: admin@example.com / password123</p>
-            </div>
           </CardContent>
-          <CardFooter className="flex flex-col gap-3">
+          <CardFooter className="flex flex-col gap-3 pt-2">
             <Button type="submit" className="w-full" disabled={isSubmitting}>
               {isSubmitting && (
                 <Loader2 className="mr-2 h-4 w-4 animate-spin" />

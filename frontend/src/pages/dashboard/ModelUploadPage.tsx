@@ -19,9 +19,37 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import type { ModelVisibility } from "@/types";
-import { Upload, FileUp, X, Loader2 } from "lucide-react";
+import {
+  requestUploadUrl,
+  uploadFileToSignedUrl,
+  confirmUpload,
+} from "@/lib/models-api";
+import { Upload, FileUp, X, Loader2, CheckCircle } from "lucide-react";
 
 const ACCEPTED_EXTENSIONS = [".step", ".stp", ".iges", ".igs", ".stl", ".x_t"];
+
+/**
+ * Map file extension to backend file_format enum value.
+ */
+function getFileFormat(filename: string): string {
+  const ext = filename.split(".").pop()?.toLowerCase() ?? "";
+  const map: Record<string, string> = {
+    step: "STEP",
+    stp: "STEP",
+    iges: "IGES",
+    igs: "IGES",
+    stl: "STL",
+    x_t: "PARASOLID",
+  };
+  return map[ext] ?? "STEP";
+}
+
+type UploadStep =
+  | "idle"
+  | "requesting_url"
+  | "uploading"
+  | "confirming"
+  | "done";
 
 export function ModelUploadPage() {
   const navigate = useNavigate();
@@ -30,7 +58,8 @@ export function ModelUploadPage() {
   const [visibility, setVisibility] = useState<ModelVisibility>("PRIVATE");
   const [isDragOver, setIsDragOver] = useState(false);
   const [error, setError] = useState("");
-  const [isUploading, setIsUploading] = useState(false);
+  const [step, setStep] = useState<UploadStep>("idle");
+  const [uploadProgress, setUploadProgress] = useState(0);
 
   const validateFile = (f: File): boolean => {
     const ext = `.${f.name.split(".").pop()?.toLowerCase()}`;
@@ -71,18 +100,52 @@ export function ModelUploadPage() {
       return;
     }
 
-    setIsUploading(true);
+    setError("");
 
-    // Simulate upload delay
-    await new Promise((resolve) => setTimeout(resolve, 1500));
+    try {
+      // Step 1: Request signed upload URL
+      setStep("requesting_url");
+      const fileFormat = getFileFormat(file.name);
+      const uploadRes = await requestUploadUrl(file.name, fileFormat, name);
 
-    setIsUploading(false);
-    navigate("/models");
+      // Step 2: Upload file directly to signed URL
+      setStep("uploading");
+      setUploadProgress(0);
+      await uploadFileToSignedUrl(uploadRes.signed_url, file, (percent) => {
+        setUploadProgress(percent);
+      });
+
+      // Step 3: Confirm upload to trigger processing
+      setStep("confirming");
+      await confirmUpload(uploadRes.model_id);
+
+      setStep("done");
+
+      // Navigate to model detail after short delay to show success
+      setTimeout(() => {
+        navigate(`/models/${uploadRes.model_id}`);
+      }, 800);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Upload failed");
+      setStep("idle");
+    }
   };
 
   const removeFile = () => {
     setFile(null);
     setError("");
+    setStep("idle");
+    setUploadProgress(0);
+  };
+
+  const isUploading = step !== "idle" && step !== "done";
+
+  const stepLabels: Record<UploadStep, string> = {
+    idle: "Upload Model",
+    requesting_url: "Preparing upload...",
+    uploading: `Uploading... ${uploadProgress}%`,
+    confirming: "Confirming upload...",
+    done: "Upload complete!",
   };
 
   return (
@@ -94,9 +157,9 @@ export function ModelUploadPage() {
 
       <div className="grid gap-6 lg:grid-cols-2">
         {/* Drop zone */}
-        <Card>
+        <Card className="border-border bg-card">
           <CardHeader>
-            <CardTitle>CAD File</CardTitle>
+            <CardTitle className="text-base font-semibold">CAD File</CardTitle>
             <CardDescription>
               Supported formats: STEP, IGES, STL, Parasolid (.x_t)
             </CardDescription>
@@ -110,13 +173,13 @@ export function ModelUploadPage() {
                 }}
                 onDragLeave={() => setIsDragOver(false)}
                 onDrop={handleDrop}
-                className={`flex flex-col items-center justify-center rounded-lg border-2 border-dashed p-8 text-center transition-colors ${
+                className={`flex flex-col items-center justify-center rounded-lg border border-dashed p-10 text-center transition-colors ${
                   isDragOver
                     ? "border-primary bg-primary/5"
-                    : "border-muted-foreground/25 hover:border-primary/50"
+                    : "border-border hover:border-primary/40"
                 }`}
               >
-                <Upload className="mb-4 h-10 w-10 text-muted-foreground" />
+                <Upload className="mb-4 h-10 w-10 text-muted-foreground/50" />
                 <p className="mb-2 text-sm font-medium">
                   Drag & drop your CAD file here
                 </p>
@@ -139,19 +202,36 @@ export function ModelUploadPage() {
                 </label>
               </div>
             ) : (
-              <div className="flex items-center justify-between rounded-lg border p-4">
-                <div className="flex items-center gap-3">
-                  <FileUp className="h-8 w-8 text-primary" />
-                  <div>
-                    <p className="text-sm font-medium">{file.name}</p>
-                    <p className="text-xs text-muted-foreground">
-                      {(file.size / 1024 / 1024).toFixed(2)} MB
-                    </p>
+              <div className="space-y-3">
+                <div className="flex items-center justify-between rounded-lg border border-border p-4">
+                  <div className="flex items-center gap-3">
+                    <FileUp className="h-8 w-8 text-primary" />
+                    <div>
+                      <p className="text-sm font-medium">{file.name}</p>
+                      <p className="text-xs text-muted-foreground">
+                        {(file.size / 1024 / 1024).toFixed(2)} MB
+                      </p>
+                    </div>
                   </div>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    onClick={removeFile}
+                    disabled={isUploading}
+                  >
+                    <X className="h-4 w-4" />
+                  </Button>
                 </div>
-                <Button variant="ghost" size="icon" onClick={removeFile}>
-                  <X className="h-4 w-4" />
-                </Button>
+
+                {/* Upload progress bar */}
+                {step === "uploading" && (
+                  <div className="w-full bg-muted rounded-full h-1.5">
+                    <div
+                      className="bg-primary h-1.5 rounded-full transition-all duration-300"
+                      style={{ width: `${uploadProgress}%` }}
+                    />
+                  </div>
+                )}
               </div>
             )}
 
@@ -160,33 +240,36 @@ export function ModelUploadPage() {
         </Card>
 
         {/* Model details */}
-        <Card>
+        <Card className="border-border bg-card">
           <CardHeader>
-            <CardTitle>Model Details</CardTitle>
+            <CardTitle className="text-base font-semibold">Model Details</CardTitle>
             <CardDescription>
               Provide metadata for your CAD model.
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="space-y-2">
-              <Label htmlFor="model-name">Model Name</Label>
+              <Label htmlFor="model-name" className="text-sm font-medium">Model Name</Label>
               <Input
                 id="model-name"
                 placeholder="e.g., Bracket Assembly v2"
                 value={name}
                 onChange={(e) => setName(e.target.value)}
+                disabled={isUploading}
+                className="bg-input border-border"
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="visibility">Visibility</Label>
+              <Label htmlFor="visibility" className="text-sm font-medium">Visibility</Label>
               <Select
                 value={visibility}
                 onValueChange={(v) => setVisibility(v as ModelVisibility)}
+                disabled={isUploading}
               >
-                <SelectTrigger>
+                <SelectTrigger className="bg-input border-border">
                   <SelectValue />
                 </SelectTrigger>
-                <SelectContent>
+                <SelectContent className="border-border">
                   <SelectItem value="PRIVATE">Private</SelectItem>
                   <SelectItem value="PUBLIC">Public</SelectItem>
                 </SelectContent>
@@ -195,18 +278,23 @@ export function ModelUploadPage() {
 
             <Button
               className="w-full mt-4"
-              disabled={!file || !name || isUploading}
+              disabled={!file || !name || isUploading || step === "done"}
               onClick={handleUpload}
             >
-              {isUploading ? (
+              {step === "done" ? (
+                <>
+                  <CheckCircle className="mr-2 h-4 w-4" />
+                  {stepLabels[step]}
+                </>
+              ) : isUploading ? (
                 <>
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  Uploading...
+                  {stepLabels[step]}
                 </>
               ) : (
                 <>
                   <Upload className="mr-2 h-4 w-4" />
-                  Upload Model
+                  {stepLabels[step]}
                 </>
               )}
             </Button>

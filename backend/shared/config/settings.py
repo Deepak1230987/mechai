@@ -22,6 +22,9 @@ class Settings(BaseSettings):
     JWT_ALGORITHM: str = "HS256"
     JWT_ACCESS_TOKEN_EXPIRE_MINUTES: int = 60
 
+    # ── Storage ──────────────────────────────────────────────────────────────
+    LOCAL_STORAGE_PATH: str = "local_uploads"  # Dev-mode file storage directory
+
     # ── GCP ───────────────────────────────────────────────────────────────────
     GCP_PROJECT_ID: str = ""
     GCS_BUCKET_NAME: str = "mechai-cad-uploads"

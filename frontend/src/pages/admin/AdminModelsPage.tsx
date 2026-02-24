@@ -20,7 +20,7 @@ export function AdminModelsPage() {
         description="View and manage all CAD models across the platform."
       />
 
-      <Card>
+      <Card className="border-border bg-card">
         <CardContent className="p-0">
           <Table>
             <TableHeader>
