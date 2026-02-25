@@ -1,0 +1,23 @@
+Design Decisions
+Why Feature Detection Must Be Deterministic First
+The architecture rule "deterministic rule engine before LLM" exists for a critical reason: manufacturing decisions require traceable, repeatable outputs. When a machinist receives a feature list saying "12mm through-hole at (50, 30, 0)", that must come from exact geometric computation — not a statistical prediction. OpenCascade gives us the analytic surface type, edge geometry, and topological relationships directly from the BRep kernel. Every run on the same STEP file produces the identical feature set. This is non-negotiable for RFQ pricing — you cannot quote a part if the feature list changes between calls.
+
+Why AI Must Not Replace Geometric Logic
+AI (LLMs, CNNs) can augment feature recognition — e.g., classifying complex compound features, suggesting manufacturing strategies — but it cannot replace the geometric foundation. An LLM doesn't know whether two faces are coplanar or whether a cylindrical surface has circular boundary edges. It would hallucinate dimensions. The correct architecture is: deterministic detection → structured JSON → AI planning layer (future service). The feature recognition engine produces the ground truth; AI consumes it downstream.
+
+How Modular Detectors Prevent Spaghetti Code
+Each detector (holes, pockets, slots, lathe profiles) has different topology traversal patterns, different face/edge relationships, and different dimensional extraction logic. Merging them into a single detect_all_features() function would create a 500+ line monolith where every bug fix risks breaking unrelated detection. Separate detector classes mean:
+Each can be tested independently with specific STEP fixtures
+New detectors (bosses, chamfers, fillets) are added without touching hole detection
+Confidence thresholds and heuristics are isolated per feature type
+Limitations of Heuristic Detection
+This is MVP-grade deterministic recognition, not a commercial feature recognition kernel. Known limitations:
+
+Pockets: Only detects rectangular/simple pockets — T-slots, irregular shapes may be missed
+Slots: Requires clean parallel face pairs — complex multi-axis slots won't match
+Lathe profiles: A rotational symmetry heuristic, not true profile recognition
+Intersecting features: A hole through a pocket wall may be detected as two separate features
+Tolerance: OCC geometric queries use floating-point comparison — edge cases exist
+
+
+These are acceptable for MVP. The modular structure means each detector can be progressively improved without architectural changes.

@@ -96,3 +96,46 @@ async def models_root_proxy(
             "X-User-Role": user.role,
         },
     )
+
+
+# ─── AI / Planning routes (protected — JWT required) ─────────────────────────
+
+@gateway_router.api_route(
+    "/planning/{path:path}",
+    methods=["GET", "POST", "PUT", "DELETE", "PATCH"],
+)
+async def planning_proxy(
+    request: Request,
+    path: str,
+    user: CurrentUser = Depends(require_auth),
+):
+    """Proxy all /planning/* requests to the AI Service."""
+    return await proxy_request(
+        request=request,
+        target_base_url=settings.AI_SERVICE_URL,
+        target_path=f"/planning/{path}",
+        extra_headers={
+            "X-User-ID": user.user_id,
+            "X-User-Role": user.role,
+        },
+    )
+
+
+@gateway_router.api_route(
+    "/planning",
+    methods=["GET", "POST"],
+)
+async def planning_root_proxy(
+    request: Request,
+    user: CurrentUser = Depends(require_auth),
+):
+    """Proxy /planning (root) requests to AI Service."""
+    return await proxy_request(
+        request=request,
+        target_base_url=settings.AI_SERVICE_URL,
+        target_path="/planning/",
+        extra_headers={
+            "X-User-ID": user.user_id,
+            "X-User-Role": user.role,
+        },
+    )
