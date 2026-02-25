@@ -29,6 +29,7 @@ from cad_service.schemas import (
     ModelListResponse,
     ViewerUrlResponse,
     GeometryResponse,
+    FeatureResponse,
 )
 
 logger = logging.getLogger(__name__)
@@ -236,7 +237,7 @@ async def get_model(
 
     # If READY, attach geometry data and glTF URL
     if model.status == "READY":
-        from cad_worker.models import ModelGeometry
+        from cad_worker.models import ModelGeometry, ModelFeature
 
         geo_result = await db.execute(
             select(ModelGeometry).where(ModelGeometry.model_id == model_id)
@@ -244,6 +245,16 @@ async def get_model(
         geometry = geo_result.scalar_one_or_none()
         if geometry:
             response.geometry = GeometryResponse.model_validate(geometry)
+
+        # Attach detected features
+        feat_result = await db.execute(
+            select(ModelFeature).where(ModelFeature.model_id == model_id)
+        )
+        features = feat_result.scalars().all()
+        if features:
+            response.features = [
+                FeatureResponse.model_validate(f) for f in features
+            ]
 
         if model.gltf_path:
             response.gltf_url = _generate_signed_read_url(model.gltf_path)

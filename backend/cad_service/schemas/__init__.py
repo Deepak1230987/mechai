@@ -41,6 +41,20 @@ class GeometryResponse(BaseModel):
     model_config = {"from_attributes": True}
 
 
+class FeatureResponse(BaseModel):
+    """A single detected machining feature."""
+    type: str
+    dimensions: dict
+    depth: float | None = None
+    diameter: float | None = None
+    axis: dict | None = None
+    tolerance: float | None = None
+    surface_finish: str | None = None
+    confidence: float
+
+    model_config = {"from_attributes": True}
+
+
 # ── Responses ─────────────────────────────────────────────────────────────────
 
 class UploadResponse(BaseModel):
@@ -60,6 +74,7 @@ class ModelResponse(BaseModel):
     visibility: str
     created_at: datetime
     geometry: GeometryResponse | None = None
+    features: list[FeatureResponse] | None = None
     gltf_url: str | None = None
 
     model_config = {"from_attributes": True}

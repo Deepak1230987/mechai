@@ -34,6 +34,7 @@ class Settings(BaseSettings):
     # ── Service URLs (used by API Gateway for proxying) ───────────────────────
     AUTH_SERVICE_URL: str = "http://localhost:8001"
     CAD_SERVICE_URL: str = "http://localhost:8002"
+    AI_SERVICE_URL: str = "http://localhost:8003"
 
     # ── CORS ──────────────────────────────────────────────────────────────────
     CORS_ORIGINS: list[str] = ["http://localhost:5173"]

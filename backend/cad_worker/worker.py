@@ -38,7 +38,12 @@ import trimesh
 from shared.config import get_settings
 from shared.storage import save_file
 from cad_worker.geometry_engine import get_engine, UnsupportedFormatError
-from cad_worker.services.db_service import save_geometry_result, update_model_status
+from cad_worker.geometry_engine.feature_recognition import detect_all_features
+from cad_worker.services.db_service import (
+    save_geometry_result,
+    update_model_status,
+    save_features,
+)
 from cad_worker.services.storage_service import download_file
 
 logger = logging.getLogger("cad_worker.worker")
@@ -93,6 +98,27 @@ async def process_message(model_id: str, storage_path: str) -> None:
         # ── 6. Save geometry to DB ───────────────────────────────────────
         geometry_id = await save_geometry_result(model_id, geometry_result)
         logger.info(f"[{model_id}] Geometry record saved: {geometry_id}")
+
+        # ── 6b. Feature recognition (BRep only) ─────────────────────────
+        if geometry_result.geometry_type == "BREP":
+            logger.info(f"[{model_id}] Running feature recognition (BRep)...")
+            # Load shape once for feature detection (reuse engine)
+            brep_shape = await asyncio.to_thread(engine.load_shape, local_path)
+            feature_results = await asyncio.to_thread(
+                detect_all_features, brep_shape
+            )
+            if feature_results:
+                feature_ids = await save_features(model_id, feature_results)
+                logger.info(
+                    f"[{model_id}] {len(feature_ids)} features saved"
+                )
+            else:
+                logger.info(f"[{model_id}] No features detected")
+        else:
+            logger.info(
+                f"[{model_id}] Skipping feature recognition "
+                f"(geometry_type={geometry_result.geometry_type})"
+            )
 
         # ── 7. Generate glTF ─────────────────────────────────────────────
         glb_data = await _generate_gltf(model_id, local_path, ext)
