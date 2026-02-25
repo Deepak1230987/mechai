@@ -23,6 +23,7 @@ httpx==0.28.1
 # CAD Processing
 trimesh==4.4.1
 numpy==1.26.4
+cadquery-ocp  # OpenCascade (OCP) — BRep processing for STEP/IGES
 
 # GCP (lazy-imported at runtime when ENV=production)
 google-cloud-storage==2.18.2

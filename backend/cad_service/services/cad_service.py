@@ -28,6 +28,7 @@ from cad_service.schemas import (
     ModelResponse,
     ModelListResponse,
     ViewerUrlResponse,
+    GeometryResponse,
 )
 
 logger = logging.getLogger(__name__)
@@ -219,7 +220,7 @@ async def get_model(
     user_id: str,
     db: AsyncSession,
 ) -> ModelResponse:
-    """Fetch a single model with ownership check."""
+    """Fetch a single model with ownership check. Include geometry if READY."""
 
     result = await db.execute(
         select(CADModel).where(CADModel.id == model_id)
@@ -231,7 +232,23 @@ async def get_model(
     if model.user_id != user_id and model.visibility != "PUBLIC":
         raise HTTPException(status_code=403, detail="Access denied")
 
-    return ModelResponse.model_validate(model)
+    response = ModelResponse.model_validate(model)
+
+    # If READY, attach geometry data and glTF URL
+    if model.status == "READY":
+        from cad_worker.models import ModelGeometry
+
+        geo_result = await db.execute(
+            select(ModelGeometry).where(ModelGeometry.model_id == model_id)
+        )
+        geometry = geo_result.scalar_one_or_none()
+        if geometry:
+            response.geometry = GeometryResponse.model_validate(geometry)
+
+        if model.gltf_path:
+            response.gltf_url = _generate_signed_read_url(model.gltf_path)
+
+    return response
 
 
 async def get_viewer_url(

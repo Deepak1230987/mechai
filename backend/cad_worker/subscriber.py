@@ -14,7 +14,7 @@ from sqlalchemy import select
 from shared.config import get_settings
 from shared.db import async_session_factory
 from cad_service.models import CADModel
-from cad_worker.processor import process_model
+from cad_worker.worker import process_message
 
 logger = logging.getLogger("cad_worker.subscriber")
 settings = get_settings()
@@ -54,7 +54,7 @@ async def _start_pubsub_subscriber() -> None:
             # (callback runs in a thread managed by the subscriber)
             loop = asyncio.new_event_loop()
             try:
-                loop.run_until_complete(process_model(model_id, gcs_path))
+                loop.run_until_complete(process_message(model_id, gcs_path))
             finally:
                 loop.close()
 
@@ -112,6 +112,6 @@ async def _start_db_poller() -> None:
 async def _safe_process(model_id: str, gcs_path: str) -> None:
     """Wrapper to catch and log processing errors."""
     try:
-        await process_model(model_id, gcs_path)
+        await process_message(model_id, gcs_path)
     except Exception as e:
         logger.error(f"Processing failed for {model_id}: {e}")

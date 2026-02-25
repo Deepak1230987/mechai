@@ -18,6 +18,7 @@ from shared.db import Base
 # ── Import all models so Base.metadata is populated ──────────────────────────
 from auth_service.models import User          # noqa: F401
 from cad_service.models import CADModel       # noqa: F401
+from cad_worker.models import ModelGeometry   # noqa: F401
 
 settings = get_settings()
 config = context.config

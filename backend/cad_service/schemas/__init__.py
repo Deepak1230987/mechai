@@ -25,6 +25,22 @@ class UpdateVisibilityRequest(BaseModel):
     visibility: str  # PRIVATE | PUBLIC
 
 
+# ── Geometry sub-schema ──────────────────────────────────────────────────────
+
+class GeometryResponse(BaseModel):
+    """Geometry metrics extracted by the CAD Worker."""
+    bounding_box: dict
+    volume: float
+    surface_area: float
+    planar_faces: int
+    cylindrical_faces: int
+    conical_faces: int
+    spherical_faces: int
+    feature_ready: bool
+
+    model_config = {"from_attributes": True}
+
+
 # ── Responses ─────────────────────────────────────────────────────────────────
 
 class UploadResponse(BaseModel):
@@ -43,6 +59,8 @@ class ModelResponse(BaseModel):
     status: str
     visibility: str
     created_at: datetime
+    geometry: GeometryResponse | None = None
+    gltf_url: str | None = None
 
     model_config = {"from_attributes": True}
 

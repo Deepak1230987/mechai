@@ -17,7 +17,6 @@ import json
 import logging
 import sys
 
-from cad_worker.processor import process_model
 from cad_worker.subscriber import start_subscriber
 
 logging.basicConfig(
