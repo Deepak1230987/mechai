@@ -19,6 +19,9 @@ from shared.db import engine, Base
 # Import models to register them with Base.metadata
 from auth_service.models import User          # noqa: F401
 from cad_service.models import CADModel       # noqa: F401
+from cad_worker.models import ModelGeometry   # noqa: F401
+from cad_worker.models import ModelFeature    # noqa: F401
+from ai_service.models import MachiningPlan   # noqa: F401
 
 
 async def init_db():
