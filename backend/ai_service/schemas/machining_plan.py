@@ -75,7 +75,7 @@ class SetupSpec(BaseModel):
 # ── Full Plan ─────────────────────────────────────────────────────────────────
 
 class MachiningPlanResponse(BaseModel):
-    """Complete deterministic machining plan returned to the client."""
+    """Complete machining plan returned to the client."""
 
     model_id: str
     material: str
@@ -87,6 +87,23 @@ class MachiningPlanResponse(BaseModel):
         0,
         ge=0,
         description="Total estimated machining time in seconds",
+    )
+    version: int = Field(
+        1,
+        ge=1,
+        description="Plan version — incremented on re-generation for same model",
+    )
+    approved: bool = Field(
+        False,
+        description="Human approval flag — always False on creation",
+    )
+    approved_by: str | None = Field(
+        None,
+        description="User ID who approved the plan (null until approved)",
+    )
+    approved_at: str | None = Field(
+        None,
+        description="ISO timestamp of approval (null until approved)",
     )
 
 
@@ -104,3 +121,50 @@ class PlanningRequest(BaseModel):
         ...,
         description="Target machine: MILLING_3AXIS | LATHE",
     )
+
+
+# ── Edit / Approve / Latest ──────────────────────────────────────────────────
+
+class PlanUpdateRequest(BaseModel):
+    """Input payload for POST /planning/{plan_id}/update."""
+
+    edited_plan: dict = Field(
+        ...,
+        description=(
+            "Full edited plan with keys: setups, operations, tools, estimated_time. "
+            "model_id / material / machine_type are inherited from the original."
+        ),
+    )
+    edited_by: str = Field(
+        ...,
+        description="User ID of the person making the edit",
+    )
+
+
+class PlanApproveRequest(BaseModel):
+    """Input payload for POST /planning/{plan_id}/approve."""
+
+    approved_by: str = Field(
+        ...,
+        description="User ID of the person approving the plan",
+    )
+
+
+class PlanDiff(BaseModel):
+    """Structured diff between two plan versions."""
+
+    operations_added: list[str] = []
+    operations_removed: list[str] = []
+    operations_changed: list[str] = []
+    tools_changed: list[str] = []
+    order_changed: bool = False
+    setups_changed: bool = False
+    time_delta: float = 0.0
+
+
+class PlanUpdateResponse(BaseModel):
+    """Response for a plan edit — new version + diff."""
+
+    plan: MachiningPlanResponse
+    diff: PlanDiff
+    feedback_id: str
