@@ -31,6 +31,16 @@ class Settings(BaseSettings):
     PUBSUB_TOPIC: str = "cad-processing"
     PUBSUB_SUBSCRIPTION: str = "cad-processing-sub"
 
+    # ── LLM Configuration ──────────────────────────────────────────────────────
+    # Provider: "openai" | "anthropic" | "google" | "openrouter" | "ollama" | "none"
+    LLM_PROVIDER: str = "none"
+    LLM_MODEL: str = ""                    # e.g. gpt-4o, claude-sonnet-4-20250514, gemini-2.0-flash, llama3
+    LLM_API_KEY: str = ""                  # Required for openai / anthropic / google / openrouter
+    LLM_BASE_URL: str = ""                 # Optional override (custom endpoints, Azure, etc.)
+    LLM_TEMPERATURE: float = 0.1           # Low temp for deterministic-ish output
+    LLM_MAX_TOKENS: int = 4096
+    OLLAMA_HOST: str = "http://localhost:11434"  # Ollama server URL
+
     # ── Service URLs (used by API Gateway for proxying) ───────────────────────
     AUTH_SERVICE_URL: str = "http://localhost:8001"
     CAD_SERVICE_URL: str = "http://localhost:8002"

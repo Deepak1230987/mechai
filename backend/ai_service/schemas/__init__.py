@@ -8,6 +8,10 @@ from ai_service.schemas.machining_plan import (
     OperationSpec,
     SetupSpec,
     MachiningPlanResponse,
+    PlanUpdateRequest,
+    PlanApproveRequest,
+    PlanDiff,
+    PlanUpdateResponse,
 )
 
 __all__ = [
@@ -16,4 +20,8 @@ __all__ = [
     "OperationSpec",
     "SetupSpec",
     "MachiningPlanResponse",
+    "PlanUpdateRequest",
+    "PlanApproveRequest",
+    "PlanDiff",
+    "PlanUpdateResponse",
 ]

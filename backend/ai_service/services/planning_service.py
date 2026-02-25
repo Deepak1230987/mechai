@@ -1,17 +1,25 @@
 """
-Planning Service — orchestrator for deterministic machining plan generation.
+Planning Service — hybrid pipeline orchestrator.
 
 Pipeline:
-    1. Fetch features from model_features table (via model_id)
-    2. Validate feature_ready flag
-    3. Run rule engine  →  operations + tool selection
-    4. Run time estimator  →  per-operation + total time
-    5. Group into setups
-    6. Build MachiningPlanResponse
-    7. Persist plan to machining_plans table
-    8. Return plan
+     1. Validate inputs  (machine_type, model exists, feature_ready)
+     2. Fetch geometry metadata + detected features from DB
+     3. Feature Validation Layer  →  FeatureValidator (DI boundary)
+     4. Validation Logging        →  ValidationLogger (non-blocking)
+     5. Rule Engine               →  operations + tools + setups + time
+     6. Build baseline plan dict
+     7. LangChain optimiser       →  optional LLM pass (graceful fallback)
+     8. Plan Validator            →  structural + physical checks
+     9. Compute version           →  next version for this model_id
+    10. Persist plan              →  approved=False (human approval required)
+    11. Return MachiningPlanResponse
 
-No AI calls.  No geometry processing.  Only uses stored Feature records.
+Separation rules enforced:
+    • No ML logic in this file.
+    • No LLM logic in this file.
+    • Feature validator = injected via abstract interface.
+    • LangChain pipeline = separate module, called as black-box.
+    • Plan validator     = separate module, called as black-box.
 """
 
 from __future__ import annotations
@@ -21,7 +29,7 @@ import uuid
 from datetime import datetime, timezone
 
 from fastapi import HTTPException, status
-from sqlalchemy import select
+from sqlalchemy import select, func
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from cad_service.models import CADModel
@@ -37,6 +45,15 @@ from ai_service.schemas.machining_plan import (
 from ai_service.services.rule_engine import plan_operations, group_into_setups
 from ai_service.services.time_estimator import estimate_operation_time, estimate_total_time
 
+# ── Hybrid layers ─────────────────────────────────────────────────────────────
+from ai_service.services.feature_validator import FeatureValidator
+from ai_service.services.feature_validator.deterministic_validator import (
+    DeterministicFeatureValidator,
+)
+from ai_service.services.feature_validator.validation_logger import ValidationLogger
+from ai_service.services.langchain_pipeline import optimize_plan
+from ai_service.services.plan_validator import PlanValidator, PlanValidationError
+
 logger = logging.getLogger(__name__)
 
 # ── Valid inputs ──────────────────────────────────────────────────────────────
@@ -49,12 +66,24 @@ _VALID_MACHINE_TYPES = {"MILLING_3AXIS", "LATHE"}
 async def generate_plan(
     req: PlanningRequest,
     session: AsyncSession,
+    *,
+    validator: FeatureValidator | None = None,
 ) -> MachiningPlanResponse:
     """
-    Generate a complete deterministic machining plan.
+    Generate a versioned machining plan (approved=False).
 
-    Raises HTTPException on invalid input or missing data.
+    Args:
+        req:        PlanningRequest with model_id, material, machine_type.
+        session:    Async DB session (commit handled by caller / DI).
+        validator:  Optional FeatureValidator override (DI).  Defaults to
+                    DeterministicFeatureValidator.
+
+    Raises:
+        HTTPException on invalid input, missing data, or plan validation failure.
     """
+
+    if validator is None:
+        validator = DeterministicFeatureValidator()
 
     # ── 1. Validate machine type ─────────────────────────────────────────────
     if req.machine_type not in _VALID_MACHINE_TYPES:
@@ -76,7 +105,7 @@ async def generate_plan(
             detail=f"Model status is '{model.status}', must be READY for planning",
         )
 
-    # ── 3. Verify feature_ready ──────────────────────────────────────────────
+    # ── 3. Fetch geometry metadata ───────────────────────────────────────────
     geom_result = await session.execute(
         select(ModelGeometry).where(ModelGeometry.model_id == req.model_id)
     )
@@ -87,7 +116,15 @@ async def generate_plan(
             detail="Feature extraction not ready (BRep required for planning)",
         )
 
-    # ── 4. Fetch features ────────────────────────────────────────────────────
+    geometry_metadata: dict = {
+        "volume": geom.volume,
+        "surface_area": geom.surface_area,
+        "bounding_box": geom.bounding_box or {},
+        "face_count": geom.face_count,
+        "edge_count": geom.edge_count,
+    }
+
+    # ── 4. Fetch raw features ────────────────────────────────────────────────
     feat_result = await session.execute(
         select(ModelFeature).where(ModelFeature.model_id == req.model_id)
     )
@@ -98,27 +135,51 @@ async def generate_plan(
             detail="No features detected on this model — cannot generate plan",
         )
 
-    # Convert ORM rows → plain dicts for the rule engine
-    features: list[dict] = []
-    for f in features_db:
-        features.append({
+    raw_features: list[dict] = [
+        {
             "id": f.id,
             "type": f.type,
+            "confidence": getattr(f, "confidence", 1.0),
             "dimensions": f.dimensions or {},
             "depth": f.depth,
             "diameter": f.diameter,
             "axis": f.axis,
-        })
+        }
+        for f in features_db
+    ]
 
-    # ── 5. Run rule engine ───────────────────────────────────────────────────
-    planned_ops = plan_operations(features, req.material, req.machine_type)
+    # ── 5. Feature Validation Layer (ML boundary) ────────────────────────────
+    validated_features = validator.validate(raw_features, geometry_metadata)
+    if not validated_features:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="All features were rejected by validation — cannot generate plan",
+        )
+
+    logger.info(
+        "Feature validation: %d raw → %d validated",
+        len(raw_features),
+        len(validated_features),
+    )
+
+    # ── 6. Validation Logging (non-blocking) ─────────────────────────────────
+    vl = ValidationLogger(session)
+    await vl.log(
+        model_id=req.model_id,
+        raw_features=raw_features,
+        validated_features=validated_features,
+        geometry_snapshot=geometry_metadata,
+    )
+
+    # ── 7. Rule Engine ───────────────────────────────────────────────────────
+    planned_ops = plan_operations(validated_features, req.material, req.machine_type)
     if not planned_ops:
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
             detail="Rule engine produced no operations — check features and machine type",
         )
 
-    # ── 6. Build tool de-duplication map ─────────────────────────────────────
+    # ── 8. Build tool de-duplication map + operation specs ───────────────────
     tool_map: dict[str, ToolSpec] = {}
     for op in planned_ops:
         if op.tool and op.tool.id not in tool_map:
@@ -131,7 +192,6 @@ async def generate_plan(
                 recommended_rpm_max=op.tool.rpm_max,
             )
 
-    # ── 7. Estimate time per operation ───────────────────────────────────────
     operation_specs: list[OperationSpec] = []
     operation_times: list[float] = []
 
@@ -160,7 +220,7 @@ async def generate_plan(
 
     total_time = round(estimate_total_time(operation_times), 2)
 
-    # ── 8. Group into setups ─────────────────────────────────────────────────
+    # ── 9. Group into setups ─────────────────────────────────────────────────
     setup_dicts = group_into_setups(planned_ops, req.machine_type)
     setup_specs = [
         SetupSpec(
@@ -171,8 +231,8 @@ async def generate_plan(
         for s in setup_dicts
     ]
 
-    # ── 9. Assemble response ─────────────────────────────────────────────────
-    plan = MachiningPlanResponse(
+    # ── 10. Build baseline plan dict ─────────────────────────────────────────
+    base_plan = MachiningPlanResponse(
         model_id=req.model_id,
         material=req.material,
         machine_type=req.machine_type,
@@ -180,25 +240,72 @@ async def generate_plan(
         operations=operation_specs,
         tools=list(tool_map.values()),
         estimated_time=total_time,
+        version=1,       # placeholder — final version computed below
+        approved=False,
+    )
+    base_plan_dict = base_plan.model_dump()
+
+    # ── 11. LangChain optimiser (optional, graceful fallback) ────────────────
+    optimised_dict = await optimize_plan(
+        base_plan=base_plan_dict,
+        validated_features=validated_features,
+        material=req.material,
+        machine_type=req.machine_type,
     )
 
-    # ── 10. Persist to DB ────────────────────────────────────────────────────
+    # ── 12. Plan Validator ───────────────────────────────────────────────────
+    pv = PlanValidator(validated_features, req.material, req.machine_type)
+    try:
+        validated_plan_dict = pv.validate(optimised_dict)
+    except PlanValidationError as exc:
+        logger.warning(
+            "LLM-optimised plan failed validation (%s) — falling back to baseline",
+            exc.errors,
+        )
+        # Validate baseline as safety net (should always pass)
+        try:
+            validated_plan_dict = pv.validate(base_plan_dict)
+        except PlanValidationError:
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="Both optimised and baseline plans failed validation",
+            )
+
+    # ── 13. Compute next version ─────────────────────────────────────────────
+    max_version_result = await session.execute(
+        select(func.coalesce(func.max(MachiningPlanModel.version), 0)).where(
+            MachiningPlanModel.model_id == req.model_id
+        )
+    )
+    next_version: int = max_version_result.scalar_one() + 1
+
+    # ── 14. Assemble final response ──────────────────────────────────────────
+    # Overlay version + approved onto validated plan
+    validated_plan_dict["version"] = next_version
+    validated_plan_dict["approved"] = False
+
+    final_plan = MachiningPlanResponse(**validated_plan_dict)
+
+    # ── 15. Persist to DB (approved=False) ───────────────────────────────────
     plan_row = MachiningPlanModel(
         id=str(uuid.uuid4()),
         model_id=req.model_id,
         material=req.material,
         machine_type=req.machine_type,
-        plan_data=plan.model_dump(),
-        estimated_time=total_time,
+        plan_data=final_plan.model_dump(),
+        estimated_time=final_plan.estimated_time,
+        version=next_version,
+        approved=False,
     )
     session.add(plan_row)
-    # Commit happens via get_session context manager
 
     logger.info(
-        "Generated plan for model=%s: %d ops, %d tools, %.1f s total",
+        "Generated plan v%d for model=%s: %d ops, %d tools, %.1f s total "
+        "(approved=False)",
+        next_version,
         req.model_id,
-        len(operation_specs),
-        len(tool_map),
-        total_time,
+        len(final_plan.operations),
+        len(final_plan.tools),
+        final_plan.estimated_time,
     )
-    return plan
+    return final_plan
