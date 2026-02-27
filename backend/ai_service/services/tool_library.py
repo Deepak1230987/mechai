@@ -57,6 +57,8 @@ _CATALOGUE: list[Tool] = [
     Tool("drill-25mm",  "DRILL", 25.0, 200, ("ALUMINUM", "STEEL"),                        400,  1500),
 
     # ── Flat end mills ────────────────────────────────────────────────────────
+    Tool("fem-1mm",  "FLAT_END_MILL", 1.0,  8,   ("ALUMINUM", "PLASTIC"),                      8000, 20000),
+    Tool("fem-2mm",  "FLAT_END_MILL", 2.0,  12,  ("ALUMINUM", "STEEL", "PLASTIC"),              6000, 16000),
     Tool("fem-3mm",  "FLAT_END_MILL", 3.0,  20,  ("ALUMINUM", "STEEL", "PLASTIC"),           4000, 12000),
     Tool("fem-4mm",  "FLAT_END_MILL", 4.0,  25,  ("ALUMINUM", "STEEL", "PLASTIC"),           3500, 10000),
     Tool("fem-6mm",  "FLAT_END_MILL", 6.0,  35,  ("ALUMINUM", "STEEL", "TITANIUM", "PLASTIC"), 3000, 9000),

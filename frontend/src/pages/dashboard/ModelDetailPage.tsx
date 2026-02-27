@@ -2,6 +2,12 @@ import { useEffect, useRef, useState } from "react";
 import { useParams, Link } from "react-router-dom";
 import { PageHeader } from "@/components/shared/PageHeader";
 import { StatusBadge } from "@/components/shared/StatusBadge";
+import { GeometrySummaryCard } from "@/components/shared/GeometrySummaryCard";
+import { FeaturePanel } from "@/components/shared/FeaturePanel";
+import {
+  STLWarningBanner,
+  MeshModelInfoCard,
+} from "@/components/shared/STLWarningBanner";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -12,6 +18,12 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 import { ModelViewer } from "@/components/viewer/ModelViewer";
 import { getModel, getViewerUrl } from "@/lib/models-api";
 import type { Model } from "@/types";
@@ -25,6 +37,7 @@ import {
   AlertCircle,
   FileType,
   RefreshCw,
+  Cog,
 } from "lucide-react";
 
 const POLL_INTERVAL_MS = 5_000;
@@ -148,6 +161,9 @@ export function ModelDetailPage() {
   const isProcessing =
     model.status === "PROCESSING" || model.status === "UPLOADED";
 
+  // ── STL awareness ─────────────────────────────────────────────────
+  const isSTL = model.file_format?.toUpperCase() === "STL";
+
   return (
     <>
       <PageHeader title={model.name} description={`Model ID: ${model.id}`}>
@@ -159,11 +175,21 @@ export function ModelDetailPage() {
         </Button>
       </PageHeader>
 
+      {/* STL banners — shown when model is READY and is STL */}
+      {model.status === "READY" && isSTL && (
+        <div className="space-y-3 mb-6">
+          <STLWarningBanner />
+          <MeshModelInfoCard />
+        </div>
+      )}
+
       <div className="grid gap-6 lg:grid-cols-3">
         {/* Model info + viewer */}
         <Card className="lg:col-span-2 border-border bg-card">
           <CardHeader>
-            <CardTitle className="text-base font-semibold">Model Information</CardTitle>
+            <CardTitle className="text-base font-semibold">
+              Model Information
+            </CardTitle>
             <CardDescription>
               Details and metadata for this CAD model.
             </CardDescription>
@@ -262,6 +288,40 @@ export function ModelDetailPage() {
             <CardTitle className="text-base font-semibold">Actions</CardTitle>
           </CardHeader>
           <CardContent className="space-y-3">
+            <TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <span className="w-full">
+                    {isSTL ? (
+                      <Button className="w-full" disabled>
+                        <Cog className="mr-2 h-4 w-4" />
+                        Machining Plan
+                      </Button>
+                    ) : (
+                      <Button
+                        className="w-full"
+                        asChild
+                        disabled={model.status !== "READY"}
+                      >
+                        <Link to={`/models/${model.id}/plan`}>
+                          <Cog className="mr-2 h-4 w-4" />
+                          Machining Plan
+                        </Link>
+                      </Button>
+                    )}
+                  </span>
+                </TooltipTrigger>
+                {isSTL && (
+                  <TooltipContent>
+                    <p>
+                      Machining plan requires B-Rep format (STEP/IGES).
+                      <br />
+                      STL does not support feature recognition.
+                    </p>
+                  </TooltipContent>
+                )}
+              </Tooltip>
+            </TooltipProvider>
             <Button className="w-full" disabled={model.status !== "READY"}>
               Request RFQ
             </Button>
@@ -278,6 +338,23 @@ export function ModelDetailPage() {
           </CardContent>
         </Card>
       </div>
+
+      {/* Geometry Summary — always shown when READY and geometry exists */}
+      {model.status === "READY" && model.geometry && (
+        <div className="mt-6">
+          <GeometrySummaryCard geometry={model.geometry} isSTL={isSTL} />
+        </div>
+      )}
+
+      {/* Feature Panel — only for non-STL models with features */}
+      {model.status === "READY" &&
+        !isSTL &&
+        model.features &&
+        model.features.length > 0 && (
+          <div className="mt-6">
+            <FeaturePanel features={model.features} />
+          </div>
+        )}
     </>
   );
 }

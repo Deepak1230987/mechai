@@ -120,8 +120,10 @@ async def generate_plan(
         "volume": geom.volume,
         "surface_area": geom.surface_area,
         "bounding_box": geom.bounding_box or {},
-        "face_count": geom.face_count,
-        "edge_count": geom.edge_count,
+        "planar_faces": geom.planar_faces,
+        "cylindrical_faces": geom.cylindrical_faces,
+        "conical_faces": geom.conical_faces,
+        "spherical_faces": geom.spherical_faces,
     }
 
     # ── 4. Fetch raw features ────────────────────────────────────────────────

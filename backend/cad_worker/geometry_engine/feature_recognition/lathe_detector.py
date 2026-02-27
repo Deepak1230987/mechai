@@ -55,11 +55,6 @@ class LatheDetector(FeatureDetectorBase):
             return []
 
     def _detect_impl(self, shape: Any) -> list[FeatureResult]:
-        from OCP.TopExp import TopExp_Explorer
-        from OCP.TopAbs import TopAbs_FACE
-        from OCP.TopoDS import TopoDS
-        from OCP.BRep import BRep_Tool
-        from OCP.GeomAdaptor import GeomAdaptor_Surface
         from OCP.GeomAbs import (
             GeomAbs_Plane,
             GeomAbs_Cylinder,
@@ -69,6 +64,8 @@ class LatheDetector(FeatureDetectorBase):
         )
         from OCP.Bnd import Bnd_Box
         from OCP.BRepBndLib import BRepBndLib
+
+        from cad_worker.geometry_engine.feature_recognition.face_iterator import iter_faces
 
         # ── Step 1: Classify all faces ───────────────────────────────────
         total_faces = 0
@@ -82,36 +79,42 @@ class LatheDetector(FeatureDetectorBase):
         # Collect cylinder/cone axes for alignment check
         axes: list[tuple[float, float, float]] = []
 
-        explorer = TopExp_Explorer(shape, TopAbs_FACE)
-        while explorer.More():
-            face = TopoDS.Face_s(explorer.Current())
-            surface = BRep_Tool.Surface_s(face)
+        for fi in iter_faces(shape):
+            total_faces += 1
+            stype = fi.effective_type
 
-            if surface is not None:
-                adaptor = GeomAdaptor_Surface(surface)
-                stype = adaptor.GetType()
-                total_faces += 1
-
-                if stype == GeomAbs_Plane:
-                    planar_count += 1
-                elif stype == GeomAbs_Cylinder:
-                    cylinder_count += 1
-                    cyl = adaptor.Cylinder()
+            if stype == GeomAbs_Plane:
+                planar_count += 1
+            elif stype == GeomAbs_Cylinder:
+                cylinder_count += 1
+                if fi.bspline_axis is not None:
+                    axes.append((
+                        fi.bspline_axis["x"],
+                        fi.bspline_axis["y"],
+                        fi.bspline_axis["z"],
+                    ))
+                else:
+                    cyl = fi.adaptor.Cylinder()
                     d = cyl.Axis().Direction()
                     axes.append((d.X(), d.Y(), d.Z()))
-                elif stype == GeomAbs_Cone:
-                    cone_count += 1
-                    cone = adaptor.Cone()
+            elif stype == GeomAbs_Cone:
+                cone_count += 1
+                if fi.bspline_axis is not None:
+                    axes.append((
+                        fi.bspline_axis["x"],
+                        fi.bspline_axis["y"],
+                        fi.bspline_axis["z"],
+                    ))
+                else:
+                    cone = fi.adaptor.Cone()
                     d = cone.Axis().Direction()
                     axes.append((d.X(), d.Y(), d.Z()))
-                elif stype == GeomAbs_Sphere:
-                    sphere_count += 1
-                elif stype == GeomAbs_Torus:
-                    torus_count += 1
-                else:
-                    other_count += 1
-
-            explorer.Next()
+            elif stype == GeomAbs_Sphere:
+                sphere_count += 1
+            elif stype == GeomAbs_Torus:
+                torus_count += 1
+            else:
+                other_count += 1
 
         if total_faces == 0:
             return []

@@ -77,6 +77,10 @@ class SetupSpec(BaseModel):
 class MachiningPlanResponse(BaseModel):
     """Complete machining plan returned to the client."""
 
+    plan_id: str | None = Field(
+        None,
+        description="DB row ID — set by the route layer, not stored in plan_data JSON",
+    )
     model_id: str
     material: str
     machine_type: str

@@ -56,7 +56,20 @@ async def generate(
         req.material,
         req.machine_type,
     )
-    return await generate_plan(req, session)
+    plan_obj = await generate_plan(req, session)
+    # generate_plan returns MachiningPlanResponse built from plan_data;
+    # overlay the DB row id so the client can call /update and /approve.
+    # plan_obj doesn't have it yet — get it from the DB.
+    from sqlalchemy import select as sa_select
+    from ai_service.models import MachiningPlan
+    row = await session.execute(
+        sa_select(MachiningPlan.id)
+        .where(MachiningPlan.model_id == req.model_id)
+        .order_by(MachiningPlan.version.desc())
+        .limit(1)
+    )
+    plan_obj.plan_id = row.scalar_one()
+    return plan_obj
 
 
 # ── Update (human edit) ──────────────────────────────────────────────────────
@@ -107,6 +120,7 @@ async def update_plan(
     )
     feedback_id = fb_result.scalar_one()
 
+    plan_response.plan_id = new_plan.id
     return PlanUpdateResponse(
         plan=plan_response,
         diff=PlanDiff(**diff_data),
@@ -140,6 +154,7 @@ async def approve(
     )
 
     response = MachiningPlanResponse(**plan.plan_data)
+    response.plan_id = plan.id
     # Overlay approval fields (plan_data JSON may not have them yet)
     response.approved = True
     response.approved_by = plan.approved_by
@@ -167,6 +182,7 @@ async def latest(
     plan = await get_latest_plan(model_id=model_id, session=session)
 
     response = MachiningPlanResponse(**plan.plan_data)
+    response.plan_id = plan.id
     response.approved = plan.approved
     response.approved_by = plan.approved_by
     response.approved_at = plan.approved_at.isoformat() if plan.approved_at else None

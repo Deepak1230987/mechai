@@ -220,6 +220,7 @@ class BRepGeometryEngine(GeometryEngineBase):
 
         Uses TopExp_Explorer to walk TopAbs_FACE entries and
         GeomAdaptor_Surface to determine the analytic surface type.
+        Falls back to BSpline curvature classification for NURBS faces.
 
         Returns:
             dict with keys: planar, cylindrical, conical, spherical
@@ -234,6 +235,11 @@ class BRepGeometryEngine(GeometryEngineBase):
             GeomAbs_Cylinder,
             GeomAbs_Cone,
             GeomAbs_Sphere,
+            GeomAbs_BSplineSurface,
+        )
+        from cad_worker.geometry_engine.bspline_classifier import (
+            classify_bspline_face,
+            SurfaceKind,
         )
 
         counts = {
@@ -262,7 +268,18 @@ class BRepGeometryEngine(GeometryEngineBase):
                         counts["conical"] += 1
                     elif surface_type == GeomAbs_Sphere:
                         counts["spherical"] += 1
-                    # Other surface types (torus, bspline, etc.) are not counted
+                    elif surface_type == GeomAbs_BSplineSurface:
+                        # Attempt to classify BSpline as analytic
+                        classified = classify_bspline_face(face)
+                        if classified.kind == SurfaceKind.PLANE:
+                            counts["planar"] += 1
+                        elif classified.kind == SurfaceKind.CYLINDER:
+                            counts["cylindrical"] += 1
+                        elif classified.kind == SurfaceKind.CONE:
+                            counts["conical"] += 1
+                        elif classified.kind == SurfaceKind.SPHERE:
+                            counts["spherical"] += 1
+                    # Other surface types (torus, bspline-other, etc.) not counted
 
                 explorer.Next()
 

@@ -50,70 +50,59 @@ class PocketDetector(FeatureDetectorBase):
             return []
 
     def _detect_impl(self, shape: Any) -> list[FeatureResult]:
-        from OCP.TopExp import TopExp_Explorer
-        from OCP.TopAbs import TopAbs_FACE, TopAbs_EDGE
-        from OCP.TopoDS import TopoDS
-        from OCP.BRep import BRep_Tool
-        from OCP.GeomAdaptor import GeomAdaptor_Surface
+        from OCP.TopAbs import TopAbs_EDGE, TopAbs_FACE
         from OCP.GeomAbs import GeomAbs_Plane
         from OCP.Bnd import Bnd_Box
         from OCP.BRepBndLib import BRepBndLib
         from OCP.TopExp import TopExp
         from OCP.TopTools import TopTools_IndexedDataMapOfShapeListOfShape
 
+        from cad_worker.geometry_engine.feature_recognition.face_iterator import iter_faces
+
         # ── Step 1: Collect all planar faces with normals ────────────────
         planar_faces: list[dict] = []
         all_face_data: list[dict] = []
-        face_index = 0
 
-        explorer = TopExp_Explorer(shape, TopAbs_FACE)
-        while explorer.More():
-            face = TopoDS.Face_s(explorer.Current())
-            surface = BRep_Tool.Surface_s(face)
+        for face_index, fi in enumerate(iter_faces(shape)):
+            # Get face bounding box
+            face_bbox = Bnd_Box()
+            BRepBndLib.Add_s(fi.face, face_bbox)
+            xmin, ymin, zmin, xmax, ymax, zmax = face_bbox.Get()
 
-            if surface is not None:
-                adaptor = GeomAdaptor_Surface(surface)
-                stype = adaptor.GetType()
+            face_info: dict = {
+                "face": fi.face,
+                "index": face_index,
+                "type": fi.effective_type,
+                "bbox": {
+                    "xmin": xmin, "ymin": ymin, "zmin": zmin,
+                    "xmax": xmax, "ymax": ymax, "zmax": zmax,
+                },
+            }
 
-                # Get face bounding box
-                face_bbox = Bnd_Box()
-                BRepBndLib.Add_s(face, face_bbox)
-                xmin, ymin, zmin, xmax, ymax, zmax = face_bbox.Get()
-
-                face_info = {
-                    "face": face,
-                    "index": face_index,
-                    "type": stype,
-                    "bbox": {
-                        "xmin": xmin, "ymin": ymin, "zmin": zmin,
-                        "xmax": xmax, "ymax": ymax, "zmax": zmax,
-                    },
-                }
-
-                if stype == GeomAbs_Plane:
-                    plane = adaptor.Plane()
+            if fi.effective_type == GeomAbs_Plane:
+                # Native plane — extract from adaptor
+                if fi.bspline_normal is not None:
+                    face_info["normal"] = fi.bspline_normal
+                    face_info["plane_d"] = fi.bspline_plane_d or 0.0
+                else:
+                    plane = fi.adaptor.Plane()
                     normal = plane.Axis().Direction()
                     location = plane.Location()
-
-                    # Distance from origin along the normal
                     plane_d = (
                         location.X() * normal.X()
                         + location.Y() * normal.Y()
                         + location.Z() * normal.Z()
                     )
-
                     face_info["normal"] = {
                         "x": normal.X(),
                         "y": normal.Y(),
                         "z": normal.Z(),
                     }
                     face_info["plane_d"] = plane_d
-                    planar_faces.append(face_info)
 
-                all_face_data.append(face_info)
+                planar_faces.append(face_info)
 
-            face_index += 1
-            explorer.Next()
+            all_face_data.append(face_info)
 
         if len(planar_faces) < 2:
             return []

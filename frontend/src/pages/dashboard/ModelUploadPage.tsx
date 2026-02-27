@@ -24,7 +24,8 @@ import {
   uploadFileToSignedUrl,
   confirmUpload,
 } from "@/lib/models-api";
-import { Upload, FileUp, X, Loader2, CheckCircle } from "lucide-react";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Upload, FileUp, X, Loader2, CheckCircle, Info } from "lucide-react";
 
 const ACCEPTED_EXTENSIONS = [".step", ".stp", ".iges", ".igs", ".stl", ".x_t"];
 
@@ -60,6 +61,7 @@ export function ModelUploadPage() {
   const [error, setError] = useState("");
   const [step, setStep] = useState<UploadStep>("idle");
   const [uploadProgress, setUploadProgress] = useState(0);
+  const [stlWarning, setStlWarning] = useState(false);
 
   const validateFile = (f: File): boolean => {
     const ext = `.${f.name.split(".").pop()?.toLowerCase()}`;
@@ -67,9 +69,11 @@ export function ModelUploadPage() {
       setError(
         `Invalid file type. Accepted: ${ACCEPTED_EXTENSIONS.join(", ")}`,
       );
+      setStlWarning(false);
       return false;
     }
     setError("");
+    setStlWarning(ext === ".stl");
     return true;
   };
 
@@ -136,6 +140,7 @@ export function ModelUploadPage() {
     setError("");
     setStep("idle");
     setUploadProgress(0);
+    setStlWarning(false);
   };
 
   const isUploading = step !== "idle" && step !== "done";
@@ -235,6 +240,17 @@ export function ModelUploadPage() {
               </div>
             )}
 
+            {stlWarning && (
+              <Alert className="mt-3 border-amber-500/30 bg-amber-500/5">
+                <Info className="h-4 w-4 text-amber-600" />
+                <AlertDescription className="text-sm text-muted-foreground">
+                  STL supports viewing and RFQ only. Upload a STEP or IGES file
+                  for full machining intelligence including feature detection
+                  and automated plan generation.
+                </AlertDescription>
+              </Alert>
+            )}
+
             {error && <p className="mt-3 text-sm text-destructive">{error}</p>}
           </CardContent>
         </Card>
@@ -242,14 +258,18 @@ export function ModelUploadPage() {
         {/* Model details */}
         <Card className="border-border bg-card">
           <CardHeader>
-            <CardTitle className="text-base font-semibold">Model Details</CardTitle>
+            <CardTitle className="text-base font-semibold">
+              Model Details
+            </CardTitle>
             <CardDescription>
               Provide metadata for your CAD model.
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="space-y-2">
-              <Label htmlFor="model-name" className="text-sm font-medium">Model Name</Label>
+              <Label htmlFor="model-name" className="text-sm font-medium">
+                Model Name
+              </Label>
               <Input
                 id="model-name"
                 placeholder="e.g., Bracket Assembly v2"
@@ -260,7 +280,9 @@ export function ModelUploadPage() {
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="visibility" className="text-sm font-medium">Visibility</Label>
+              <Label htmlFor="visibility" className="text-sm font-medium">
+                Visibility
+              </Label>
               <Select
                 value={visibility}
                 onValueChange={(v) => setVisibility(v as ModelVisibility)}

@@ -32,6 +32,41 @@ export interface RegisterCredentials {
 
 export type ModelStatus = "UPLOADED" | "PROCESSING" | "READY" | "FAILED";
 export type ModelVisibility = "PRIVATE" | "PUBLIC";
+export type FileType = "STEP" | "IGES" | "STL" | "X_T" | "PARASOLID";
+
+export interface BoundingBox {
+    xmin: number;
+    ymin: number;
+    zmin: number;
+    xmax: number;
+    ymax: number;
+    zmax: number;
+    x_size: number;
+    y_size: number;
+    z_size: number;
+}
+
+export interface Geometry {
+    bounding_box: BoundingBox;
+    volume: number;
+    surface_area: number;
+    planar_faces: number;
+    cylindrical_faces: number;
+    conical_faces: number;
+    spherical_faces: number;
+    feature_ready: boolean;
+}
+
+export interface Feature {
+    type: string;
+    dimensions: Record<string, number>;
+    depth?: number;
+    diameter?: number;
+    axis?: Record<string, number>;
+    tolerance?: number;
+    surface_finish?: string;
+    confidence: number;
+}
 
 export interface Model {
     id: string;
@@ -42,6 +77,9 @@ export interface Model {
     version: number;
     status: ModelStatus;
     visibility: ModelVisibility;
+    geometry?: Geometry;
+    features?: Feature[];
+    gltf_url?: string;
     created_at: string;
 }
 
