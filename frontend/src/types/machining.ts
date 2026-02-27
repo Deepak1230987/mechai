@@ -63,6 +63,7 @@ export interface MachiningPlan {
     approved: boolean;
     approved_by: string | null;
     approved_at: string | null;
+    generation_explanation?: string | null;
 }
 
 export type MachineType = "MILLING_3AXIS" | "LATHE";

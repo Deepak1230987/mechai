@@ -204,11 +204,31 @@ async def chat(
         session=session,
     )
 
+    if result["type"] == "conversation":
+        return ChatResponse(
+            type="conversation",
+            message=result["message"],
+        )
+
+    if result["type"] == "plan_proposal":
+        proposed_plan = result["proposed_plan"]
+        plan_response = MachiningPlanResponse(**proposed_plan.plan_data)
+        plan_response.plan_id = proposed_plan.id
+        
+        return ChatResponse(
+            type="plan_proposal",
+            explanation=result["explanation"],
+            proposed_plan=plan_response,
+            version=result["new_version"],
+        )
+
+    # It's a plan_update (although currently we only return plan_proposal)
     new_plan = result["new_plan"]
     plan_response = MachiningPlanResponse(**new_plan.plan_data)
     plan_response.plan_id = new_plan.id
 
     return ChatResponse(
+        type="plan_update",
         explanation=result["explanation"],
         machining_plan=plan_response,
         version=result["new_version"],

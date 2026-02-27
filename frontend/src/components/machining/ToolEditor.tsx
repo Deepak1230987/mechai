@@ -33,10 +33,12 @@ interface ToolEditorProps {
 
 export function ToolEditor({ tool, onUpdate }: ToolEditorProps) {
   return (
-    <Card className="w-full">
+    <Card className="w-full transition-all duration-300 hover:-translate-y-1 hover:shadow-lg hover:border-primary/20 bg-card/60 backdrop-blur-sm">
       <CardHeader className="pb-3">
         <CardTitle className="flex items-center gap-2 text-sm font-medium">
-          <Wrench className="size-4 text-muted-foreground" />
+          <div className="flex size-6 items-center justify-center rounded-md bg-primary/10 text-primary">
+            <Wrench className="size-3.5" />
+          </div>
           {tool.id}
         </CardTitle>
       </CardHeader>

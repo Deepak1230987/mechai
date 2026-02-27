@@ -63,7 +63,7 @@ export function OperationRow({
     <div
       ref={setNodeRef}
       style={style}
-      className="group flex items-center gap-2 rounded-md border bg-card px-3 py-2 text-sm hover:bg-muted/50"
+      className="group flex items-center gap-3 rounded-xl border border-border/50 bg-card/50 px-3 py-2.5 text-sm backdrop-blur-sm transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md hover:border-primary/30"
     >
       {/* Drag handle */}
       <button

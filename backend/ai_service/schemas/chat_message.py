@@ -6,6 +6,7 @@ POST /planning/{plan_id}/chat  uses ChatRequest / ChatResponse.
 
 from __future__ import annotations
 
+from typing import Literal
 from pydantic import BaseModel, Field
 
 from ai_service.schemas.machining_plan import MachiningPlanResponse
@@ -27,18 +28,30 @@ class ChatRequest(BaseModel):
 # ── Response ──────────────────────────────────────────────────────────────────
 
 class ChatResponse(BaseModel):
-    """Result of a chat-driven plan refinement."""
-
-    explanation: str = Field(
+    """Result of a chat request, either a conversational message, a plan update, or a proposed plan update."""
+    
+    type: Literal["conversation", "plan_update", "plan_proposal"] = Field(
         ...,
-        description="Human-readable reasoning for the changes made",
+        description="Type of response: 'conversation' for general chat, 'plan_proposal' when a change is drafted, 'plan_update' when applied."
     )
-    machining_plan: MachiningPlanResponse = Field(
-        ...,
-        description="New plan version created from the refinement",
+    message: str | None = Field(
+        default=None,
+        description="Natural language response (used for conversation type)",
     )
-    version: int = Field(
-        ...,
+    explanation: str | None = Field(
+        default=None,
+        description="Human-readable reasoning for the changes made (used for plan_update and plan_proposal types)",
+    )
+    machining_plan: MachiningPlanResponse | None = Field(
+        default=None,
+        description="New plan version created from the refinement (used for plan_update type)",
+    )
+    proposed_plan: MachiningPlanResponse | None = Field(
+        default=None,
+        description="Drafted plan proposed to the user (used for plan_proposal type)",
+    )
+    version: int | None = Field(
+        default=None,
         ge=1,
         description="Version number of the newly created plan",
     )

@@ -68,6 +68,9 @@ export interface PlanEditorActions {
 
     /** Load a specific version for the current model. */
     loadVersion: (modelId: string, versionNum: number) => Promise<void>;
+
+    /** Apply an AI-proposed plan to the editor (marks dirty). */
+    applyProposedPlan: (plan: MachiningPlan) => void;
 }
 
 export type UsePlanEditorReturn = PlanEditorState & PlanEditorActions;
@@ -340,6 +343,12 @@ export function usePlanEditor(): UsePlanEditorReturn {
         }
     }, []);
 
+    // ── Apply Proposed Plan ──────────────────────────────────────────────
+    const applyProposedPlan = useCallback((plan: MachiningPlan) => {
+        setEditablePlan(structuredClone(plan));
+        setDirty(true);
+    }, []);
+
     // ── Warn on navigation ──────────────────────────────────────────────
     useEffect(() => {
         if (!dirty) return;
@@ -375,5 +384,6 @@ export function usePlanEditor(): UsePlanEditorReturn {
         approve,
         discard,
         loadVersion,
+        applyProposedPlan,
     };
 }

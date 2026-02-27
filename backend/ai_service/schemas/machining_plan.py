@@ -109,6 +109,10 @@ class MachiningPlanResponse(BaseModel):
         None,
         description="ISO timestamp of approval (null until approved)",
     )
+    generation_explanation: str | None = Field(
+        None,
+        description="The AI's explanation for how it generated/optimized this plan",
+    )
 
 
 # ── Request ───────────────────────────────────────────────────────────────────

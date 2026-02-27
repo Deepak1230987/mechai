@@ -102,6 +102,7 @@ export function MachiningPlanPage() {
     approve,
     discard,
     loadVersion,
+    applyProposedPlan,
   } = usePlanEditor();
 
   // Track version list refresh — incremented after save, approve, generate, chat
@@ -194,6 +195,8 @@ export function MachiningPlanPage() {
       if (!planId) throw new Error("No plan ID available.");
       const res = await chatRefinePlan(planId, { user_message: message });
       return {
+        type: res.type,
+        message: res.message,
         explanation: res.explanation,
         machining_plan: res.machining_plan as unknown as Record<
           string,
@@ -217,6 +220,16 @@ export function MachiningPlanPage() {
       setVersionRefreshKey((k) => k + 1);
     },
     [fetchPlan],
+  );
+
+  // ── Copilot plan propose handler ───────────────────────────────────────
+  const handleCopilotPlanProposed = useCallback(
+    (proposedPlan: Record<string, unknown>) => {
+      if (!editablePlan) return;
+      const plan = proposedPlan as unknown as MachiningPlan;
+      applyProposedPlan(plan);
+    },
+    [editablePlan, applyProposedPlan]
   );
 
   // ── PDF download handler ──────────────────────────────────────────────
@@ -400,15 +413,16 @@ export function MachiningPlanPage() {
 
   // ── Render: plan editor (split layout) ────────────────────────────────
   return (
-    <div className="flex flex-col gap-6 p-6">
-      {/* Back link */}
-      <Link
-        to={`/models/${modelId}`}
-        className="flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground"
-      >
-        <ArrowLeft className="size-4" />
-        Back to Model
-      </Link>
+    <div className="relative min-h-screen bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-indigo-900/20 via-background to-background">
+      <div className="relative z-10 flex flex-col gap-6 p-6">
+        {/* Back link */}
+        <Link
+          to={`/models/${modelId}`}
+          className="flex w-fit items-center gap-1 text-sm text-muted-foreground transition-colors hover:text-foreground hover:drop-shadow-md"
+        >
+          <ArrowLeft className="size-4" />
+          Back to Model
+        </Link>
 
       {/* Version selector + Header */}
       {modelId && (
@@ -551,33 +565,39 @@ export function MachiningPlanPage() {
         {/* Right column: Copilot Chat */}
         <div className="h-150 lg:sticky lg:top-6">
           <CopilotChatPanel
+            modelId={modelId || ""}
             version={editablePlan.version}
             dirty={dirty}
             onPlanUpdated={handleCopilotPlanUpdated}
+            onPlanProposed={handleCopilotPlanProposed}
             sendMessage={handleCopilotSend}
           />
         </div>
       </div>
 
-      {/* ── Bottom bar: PDF Export ─────────────────────────────────────── */}
-      <Separator />
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-2 text-sm text-muted-foreground">
-          <FileText className="size-4" />
-          <span>Download the full process planning sheet as PDF</span>
+        {/* ── Bottom bar: PDF Export ─────────────────────────────────────── */}
+        <Separator className="opacity-50" />
+        <div className="flex items-center justify-between rounded-xl border border-white/5 bg-background/40 p-4 shadow-sm backdrop-blur-md">
+          <div className="flex items-center gap-3 text-sm text-muted-foreground">
+            <div className="flex size-8 items-center justify-center rounded-full bg-primary/10 text-primary">
+              <FileText className="size-4" />
+            </div>
+            <span>Download the full process planning sheet as PDF</span>
+          </div>
+          <Button
+            variant="outline"
+            className="transition-all hover:-translate-y-0.5 hover:shadow-md"
+            onClick={handleExportPdf}
+            disabled={exporting || dirty}
+          >
+            {exporting ? (
+              <Loader2 className="mr-2 size-4 animate-spin" />
+            ) : (
+              <Download className="mr-2 size-4" />
+            )}
+            {exporting ? "Generating…" : "Download Process Sheet"}
+          </Button>
         </div>
-        <Button
-          variant="outline"
-          onClick={handleExportPdf}
-          disabled={exporting || dirty}
-        >
-          {exporting ? (
-            <Loader2 className="mr-2 size-4 animate-spin" />
-          ) : (
-            <Download className="mr-2 size-4" />
-          )}
-          {exporting ? "Generating…" : "Download Process Sheet"}
-        </Button>
       </div>
     </div>
   );

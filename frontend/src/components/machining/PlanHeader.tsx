@@ -53,38 +53,45 @@ export function PlanHeader({
   return (
     <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
       {/* Left: title + metadata */}
-      <div className="flex flex-col gap-1.5">
+      <div className="flex flex-col gap-2">
         <div className="flex items-center gap-2">
-          <h1 className="text-xl font-semibold tracking-tight">
+          <h1 className="bg-gradient-to-br from-foreground to-foreground/70 bg-clip-text text-2xl font-bold tracking-tight text-transparent">
             Machining Plan
           </h1>
-          <Badge variant="outline" className="font-mono text-xs">
+          <Badge variant="outline" className="font-mono text-xs shadow-sm bg-background/50">
             v{plan.version}
           </Badge>
           {plan.approved ? (
-            <Badge className="bg-emerald-600 text-white">
-              <CheckCircle className="mr-1 size-3" />
+            <Badge className="bg-emerald-500/10 text-emerald-500 hover:bg-emerald-500/20 shadow-sm border-emerald-500/20">
+              <CheckCircle className="mr-1.5 size-3.5" />
               Approved
             </Badge>
           ) : (
-            <Badge variant="secondary">Not Approved</Badge>
+            <Badge variant="secondary" className="shadow-sm">Not Approved</Badge>
           )}
           {dirty && (
-            <Badge variant="destructive" className="animate-pulse">
-              <AlertTriangle className="mr-1 size-3" />
+            <Badge variant="outline" className="animate-[pulse_2s_ease-in-out_infinite] border-amber-500/50 bg-amber-500/10 text-amber-500 shadow-sm">
+              <AlertTriangle className="mr-1.5 size-3.5" />
               Unsaved Changes
             </Badge>
           )}
         </div>
 
-        <div className="flex items-center gap-4 text-sm text-muted-foreground">
-          <span className="flex items-center gap-1">
-            <Clock className="size-3.5" />
+        <div className="flex items-center gap-4 text-sm font-medium text-muted-foreground/80">
+          <span className="flex items-center gap-1.5">
+            <Clock className="size-4 text-primary/70" />
             {formatTime(plan.estimated_time)}
           </span>
-          <span>{plan.material}</span>
-          <span>{plan.machine_type.replace("_", " ")}</span>
-          <span>
+          <span className="flex items-center gap-1.5">
+            <div className="h-1.5 w-1.5 rounded-full bg-primary/50" />
+            {plan.material}
+          </span>
+          <span className="flex items-center gap-1.5">
+            <div className="h-1.5 w-1.5 rounded-full bg-primary/50" />
+            {plan.machine_type.replace("_", " ")}
+          </span>
+          <span className="flex items-center gap-1.5">
+             <div className="h-1.5 w-1.5 rounded-full bg-primary/50" />
             {plan.operations.length} ops · {plan.tools.length} tools ·{" "}
             {plan.setups.length} setups
           </span>
@@ -105,13 +112,14 @@ export function PlanHeader({
           size="sm"
           onClick={onSave}
           disabled={!dirty || saving}
+          className="shadow-md transition-all hover:-translate-y-0.5"
         >
           {saving ? (
-            <Loader2 className="mr-1 size-4 animate-spin" />
+            <Loader2 className="mr-1.5 size-4 animate-spin" />
           ) : (
-            <Save className="mr-1 size-4" />
+            <Save className="mr-1.5 size-4" />
           )}
-          {saving ? "Saving…" : "Save"}
+          {saving ? "Saving…" : "Save Changes"}
         </Button>
 
         <AlertDialog>

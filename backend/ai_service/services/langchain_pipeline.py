@@ -148,7 +148,8 @@ RULES:
 5. You MAY suggest alternative tools from the same category (e.g. a larger
    end mill that covers two pockets in one pass).
 6. Preserve all required fields in the output JSON.
-7. The output must be valid JSON matching the input schema EXACTLY.
+7. Determine if any suggested changes were made, and provide a short, professional explanation of your optimization reasoning. If you made no changes, explain why the baseline was already optimal.
+8. The output must be valid JSON matching the input schema EXACTLY, plus an "explanation" field.
 
 Material: {material}
 Machine type: {machine_type}
@@ -162,7 +163,7 @@ Baseline plan:
 {plan_json}
 
 Return the optimised plan as a single JSON object with keys:
-setups, operations, tools, estimated_time.
+explanation, setups, operations, tools, estimated_time.
 """
 
 
@@ -245,7 +246,7 @@ async def _call_llm(
         logger.warning("LLM returned non-dict: %s", type(result))
         return None
 
-    required_keys = {"setups", "operations", "tools", "estimated_time"}
+    required_keys = {"explanation", "setups", "operations", "tools", "estimated_time"}
     if not required_keys.issubset(result.keys()):
         missing = required_keys - result.keys()
         logger.warning("LLM output missing keys: %s", missing)

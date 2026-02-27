@@ -257,8 +257,11 @@ async def generate_plan(
 
     # ── 12. Plan Validator ───────────────────────────────────────────────────
     pv = PlanValidator(validated_features, req.material, req.machine_type)
+    explanation = optimised_dict.pop("explanation", None)
     try:
         validated_plan_dict = pv.validate(optimised_dict)
+        if explanation:
+            validated_plan_dict["generation_explanation"] = explanation
     except PlanValidationError as exc:
         logger.warning(
             "LLM-optimised plan failed validation (%s) — falling back to baseline",
@@ -267,6 +270,7 @@ async def generate_plan(
         # Validate baseline as safety net (should always pass)
         try:
             validated_plan_dict = pv.validate(base_plan_dict)
+            validated_plan_dict["generation_explanation"] = "Baseline plan generated using deterministic rules."
         except PlanValidationError:
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,

@@ -106,9 +106,12 @@ export interface ChatRequest {
 
 /** Response from the copilot chat endpoint. */
 export interface ChatResponse {
-    explanation: string;
-    machining_plan: MachiningPlan;
-    version: number;
+    type: "conversation" | "plan_update" | "plan_proposal";
+    message?: string;
+    explanation?: string;
+    machining_plan?: MachiningPlan;
+    proposed_plan?: MachiningPlan;
+    version?: number;
 }
 
 /** Send a message to the Machining Copilot to refine the plan. */
