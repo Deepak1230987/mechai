@@ -172,3 +172,15 @@ class PlanUpdateResponse(BaseModel):
     plan: MachiningPlanResponse
     diff: PlanDiff
     feedback_id: str
+
+
+class VersionSummary(BaseModel):
+    """Lightweight summary of one plan version — used for the version picker."""
+
+    plan_id: str
+    version: int
+    approved: bool
+    approved_by: str | None = None
+    created_at: str
+    estimated_time: float = 0
+    operation_count: int = 0

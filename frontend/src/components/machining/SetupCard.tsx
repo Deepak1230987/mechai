@@ -4,15 +4,25 @@ import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Layers, Pencil, Trash2, Check, X } from "lucide-react";
 import { useState } from "react";
-import type { Setup } from "@/types/machining";
+import type { Setup, Operation } from "@/types/machining";
 
 interface SetupCardProps {
   setup: Setup;
+  /** Full operations list — used to resolve human-readable labels for op IDs. */
+  operations?: Operation[];
   onUpdate: (setupId: string, patch: Partial<Setup>) => void;
   onDelete: (setupId: string) => void;
 }
 
-export function SetupCard({ setup, onUpdate, onDelete }: SetupCardProps) {
+/** Format an operation type slug into a readable label, e.g. SLOT_MILLING → Slot Milling */
+function formatOpType(type: string): string {
+  return type
+    .split("_")
+    .map((w) => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase())
+    .join(" ");
+}
+
+export function SetupCard({ setup, operations, onUpdate, onDelete }: SetupCardProps) {
   const [editing, setEditing] = useState(false);
   const [draftOrientation, setDraftOrientation] = useState(setup.orientation);
 
@@ -89,17 +99,29 @@ export function SetupCard({ setup, onUpdate, onDelete }: SetupCardProps) {
       </CardHeader>
 
       <CardContent>
-        <div className="flex flex-wrap gap-1.5">
+        <div className="flex flex-col gap-1.5">
           {setup.operations.length === 0 ? (
             <span className="text-xs text-muted-foreground">
               No operations assigned
             </span>
           ) : (
-            setup.operations.map((opId) => (
-              <Badge key={opId} variant="outline" className="font-mono text-xs">
-                {opId}
-              </Badge>
-            ))
+            setup.operations.map((opId, idx) => {
+              const op = operations?.find((o) => o.id === opId);
+              const label = op
+                ? `${idx + 1}. ${formatOpType(op.type)} → ${op.tool_id}`
+                : `${idx + 1}. ${opId.slice(0, 8)}…`;
+
+              return (
+                <Badge
+                  key={opId}
+                  variant="outline"
+                  className="justify-start gap-1 text-xs font-normal"
+                  title={opId}
+                >
+                  {label}
+                </Badge>
+              );
+            })
           )}
         </div>
       </CardContent>

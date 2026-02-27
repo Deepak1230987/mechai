@@ -1,10 +1,24 @@
 import { useEffect, useCallback, useState } from "react";
 import { useParams, Link } from "react-router-dom";
-import { ArrowLeft, Loader2, AlertCircle, Plus, Wrench } from "lucide-react";
+import {
+  ArrowLeft,
+  Loader2,
+  AlertCircle,
+  Plus,
+  Wrench,
+  Download,
+  FileText,
+} from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Label } from "@/components/ui/label";
 import {
@@ -19,10 +33,18 @@ import { PlanHeader } from "@/components/machining/PlanHeader";
 import { OperationList } from "@/components/machining/OperationList";
 import { ToolEditor } from "@/components/machining/ToolEditor";
 import { SetupCard } from "@/components/machining/SetupCard";
+import { CopilotChatPanel } from "@/components/machining/CopilotChatPanel";
+import { VersionSelector } from "@/components/machining/VersionSelector";
 
 import { usePlanEditor } from "@/hooks/usePlanEditor";
 import { useAuth } from "@/hooks/useAuth";
-import type { Operation, Setup, MachineType } from "@/types/machining";
+import { chatRefinePlan, exportPlanPdf } from "@/lib/planning-api";
+import type {
+  Operation,
+  Setup,
+  MachineType,
+  MachiningPlan,
+} from "@/types/machining";
 
 // ─── Constants ───────────────────────────────────────────────────────────────
 
@@ -79,7 +101,11 @@ export function MachiningPlanPage() {
     save,
     approve,
     discard,
+    loadVersion,
   } = usePlanEditor();
+
+  // Track version list refresh — incremented after save, approve, generate, chat
+  const [versionRefreshKey, setVersionRefreshKey] = useState(0);
 
   // ── Fetch on mount ────────────────────────────────────────────────────
   useEffect(() => {
@@ -150,6 +176,74 @@ export function MachiningPlanPage() {
     addSetup(setup);
   }, [addSetup]);
 
+  // ── Version switch handler ────────────────────────────────────────────
+  const handleSelectVersion = useCallback(
+    (versionNum: number) => {
+      if (!modelId) return;
+      loadVersion(modelId, versionNum);
+    },
+    [modelId, loadVersion],
+  );
+
+  // ── Copilot chat send handler ─────────────────────────────────────────
+  const [exporting, setExporting] = useState(false);
+
+  const handleCopilotSend = useCallback(
+    async (message: string) => {
+      const planId = editablePlan?.plan_id;
+      if (!planId) throw new Error("No plan ID available.");
+      const res = await chatRefinePlan(planId, { user_message: message });
+      return {
+        explanation: res.explanation,
+        machining_plan: res.machining_plan as unknown as Record<
+          string,
+          unknown
+        >,
+        version: res.version,
+      };
+    },
+    [editablePlan],
+  );
+
+  // ── Copilot plan update handler ───────────────────────────────────────
+  const handleCopilotPlanUpdated = useCallback(
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    (rawPlan: Record<string, unknown>, _version: number) => {
+      // Copilot returned a new plan version — refresh from the typed object.
+      const plan = rawPlan as unknown as MachiningPlan;
+      // The hook needs to fully replace both original and editable to stay
+      // in sync and clear dirty state (the backend already persisted it).
+      fetchPlan(plan.model_id);
+      setVersionRefreshKey((k) => k + 1);
+    },
+    [fetchPlan],
+  );
+
+  // ── PDF download handler ──────────────────────────────────────────────
+  const handleExportPdf = useCallback(async () => {
+    const planId = editablePlan?.plan_id;
+    if (!planId) return;
+    setExporting(true);
+    try {
+      const blob = await exportPlanPdf(planId, {
+        include_narrative: true,
+      });
+      // Trigger browser download
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `process_plan_v${editablePlan.version}.pdf`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+    } catch {
+      // Error will surface via the api interceptor
+    } finally {
+      setExporting(false);
+    }
+  }, [editablePlan]);
+
   // ── Bridge: ToolEditor uses (toolId, patch) → hook uses (toolId, full)
   const handleUpdateTool = useCallback(
     (toolId: string, patch: Partial<import("@/types/machining").Tool>) => {
@@ -166,6 +260,7 @@ export function MachiningPlanPage() {
     if (!user) return;
     try {
       await save(user.id);
+      setVersionRefreshKey((k) => k + 1);
     } catch {
       // error is set in hook state
     }
@@ -175,6 +270,7 @@ export function MachiningPlanPage() {
     if (!user) return;
     try {
       await approve(user.id);
+      setVersionRefreshKey((k) => k + 1);
     } catch {
       // error is set in hook state
     }
@@ -225,8 +321,8 @@ export function MachiningPlanPage() {
               Generate Machining Plan
             </CardTitle>
             <CardDescription>
-              No plan exists for this model yet. Choose material and machine type
-              to generate a machining plan.
+              No plan exists for this model yet. Choose material and machine
+              type to generate a machining plan.
             </CardDescription>
           </CardHeader>
           <CardContent className="flex flex-col gap-5">
@@ -268,9 +364,7 @@ export function MachiningPlanPage() {
             </div>
 
             {/* Error inline */}
-            {error && (
-              <p className="text-sm text-destructive">{error}</p>
-            )}
+            {error && <p className="text-sm text-destructive">{error}</p>}
 
             {/* Generate button */}
             <Button
@@ -304,7 +398,7 @@ export function MachiningPlanPage() {
 
   const toolIds = editablePlan.tools.map((t) => t.id);
 
-  // ── Render: plan editor ───────────────────────────────────────────────
+  // ── Render: plan editor (split layout) ────────────────────────────────
   return (
     <div className="flex flex-col gap-6 p-6">
       {/* Back link */}
@@ -316,7 +410,17 @@ export function MachiningPlanPage() {
         Back to Model
       </Link>
 
-      {/* Header (version, status, save/approve) */}
+      {/* Version selector + Header */}
+      {modelId && (
+        <VersionSelector
+          modelId={modelId}
+          currentVersion={editablePlan.version}
+          dirty={dirty}
+          onSelectVersion={handleSelectVersion}
+          refreshKey={versionRefreshKey}
+        />
+      )}
+
       <PlanHeader
         plan={editablePlan}
         dirty={dirty}
@@ -377,67 +481,104 @@ export function MachiningPlanPage() {
 
       <Separator />
 
-      {/* Tabs: Operations | Tools | Setups */}
-      <Tabs defaultValue="operations" className="w-full">
-        <TabsList>
-          <TabsTrigger value="operations">
-            Operations ({editablePlan.operations.length})
-          </TabsTrigger>
-          <TabsTrigger value="tools">
-            Tools ({editablePlan.tools.length})
-          </TabsTrigger>
-          <TabsTrigger value="setups">
-            Setups ({editablePlan.setups.length})
-          </TabsTrigger>
-        </TabsList>
+      {/* ── Split layout: Left = editor, Right = copilot ──────────────── */}
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-[1fr_380px]">
+        {/* Left column: Tabs (Operations | Tools | Setups) */}
+        <div className="min-w-0">
+          <Tabs defaultValue="operations" className="w-full">
+            <TabsList>
+              <TabsTrigger value="operations">
+                Operations ({editablePlan.operations.length})
+              </TabsTrigger>
+              <TabsTrigger value="tools">
+                Tools ({editablePlan.tools.length})
+              </TabsTrigger>
+              <TabsTrigger value="setups">
+                Setups ({editablePlan.setups.length})
+              </TabsTrigger>
+            </TabsList>
 
-        {/* Operations tab */}
-        <TabsContent value="operations" className="mt-4">
-          <OperationList
-            operations={editablePlan.operations}
-            toolIds={toolIds}
-            onUpdate={handleUpdateOperation}
-            onDelete={handleDeleteOperation}
-            onReorder={reorderOperations}
-            onAdd={handleAddOperation}
-          />
-        </TabsContent>
-
-        {/* Tools tab */}
-        <TabsContent value="tools" className="mt-4">
-          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-            {editablePlan.tools.map((tool) => (
-              <ToolEditor
-                key={tool.id}
-                tool={tool}
-                onUpdate={handleUpdateTool}
+            {/* Operations tab */}
+            <TabsContent value="operations" className="mt-4">
+              <OperationList
+                operations={editablePlan.operations}
+                toolIds={toolIds}
+                onUpdate={handleUpdateOperation}
+                onDelete={handleDeleteOperation}
+                onReorder={reorderOperations}
+                onAdd={handleAddOperation}
               />
-            ))}
-          </div>
-        </TabsContent>
+            </TabsContent>
 
-        {/* Setups tab */}
-        <TabsContent value="setups" className="mt-4">
-          <div className="flex flex-col gap-4">
-            <div className="flex justify-end">
-              <Button variant="outline" size="sm" onClick={handleAddSetup}>
-                <Plus className="mr-1 size-4" />
-                Add Setup
-              </Button>
-            </div>
-            <div className="grid gap-4 sm:grid-cols-2">
-              {editablePlan.setups.map((setup) => (
-                <SetupCard
-                  key={setup.setup_id}
-                  setup={setup}
-                  onUpdate={handleUpdateSetup}
-                  onDelete={handleDeleteSetup}
-                />
-              ))}
-            </div>
-          </div>
-        </TabsContent>
-      </Tabs>
+            {/* Tools tab */}
+            <TabsContent value="tools" className="mt-4">
+              <div className="grid gap-4 sm:grid-cols-2">
+                {editablePlan.tools.map((tool) => (
+                  <ToolEditor
+                    key={tool.id}
+                    tool={tool}
+                    onUpdate={handleUpdateTool}
+                  />
+                ))}
+              </div>
+            </TabsContent>
+
+            {/* Setups tab */}
+            <TabsContent value="setups" className="mt-4">
+              <div className="flex flex-col gap-4">
+                <div className="flex justify-end">
+                  <Button variant="outline" size="sm" onClick={handleAddSetup}>
+                    <Plus className="mr-1 size-4" />
+                    Add Setup
+                  </Button>
+                </div>
+                <div className="grid gap-4 sm:grid-cols-2">
+                  {editablePlan.setups.map((setup) => (
+                    <SetupCard
+                      key={setup.setup_id}
+                      setup={setup}
+                      operations={editablePlan.operations}
+                      onUpdate={handleUpdateSetup}
+                      onDelete={handleDeleteSetup}
+                    />
+                  ))}
+                </div>
+              </div>
+            </TabsContent>
+          </Tabs>
+        </div>
+
+        {/* Right column: Copilot Chat */}
+        <div className="h-150 lg:sticky lg:top-6">
+          <CopilotChatPanel
+            version={editablePlan.version}
+            dirty={dirty}
+            onPlanUpdated={handleCopilotPlanUpdated}
+            sendMessage={handleCopilotSend}
+          />
+        </div>
+      </div>
+
+      {/* ── Bottom bar: PDF Export ─────────────────────────────────────── */}
+      <Separator />
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-2 text-sm text-muted-foreground">
+          <FileText className="size-4" />
+          <span>Download the full process planning sheet as PDF</span>
+        </div>
+        <Button
+          variant="outline"
+          onClick={handleExportPdf}
+          disabled={exporting || dirty}
+        >
+          {exporting ? (
+            <Loader2 className="mr-2 size-4 animate-spin" />
+          ) : (
+            <Download className="mr-2 size-4" />
+          )}
+          {exporting ? "Generating…" : "Download Process Sheet"}
+        </Button>
+      </div>
     </div>
   );
 }

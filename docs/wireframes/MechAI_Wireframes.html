@@ -1,0 +1,2518 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>MechAI (AI-CAM-RFQ) — Wireframes & Screen Flow</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Architects+Daughter&family=Patrick+Hand&family=Inter:wght@400;500;600;700&display=swap');
+
+        :root {
+            --sketch-font: 'Architects Daughter', 'Patrick Hand', cursive;
+            --ui-font: 'Inter', sans-serif;
+            --wire-border: #333;
+            --wire-bg: #fff;
+            --wire-light: #f5f5f5;
+            --wire-accent: #4A90D9;
+            --wire-accent-light: #d0e3f7;
+            --wire-gray: #888;
+            --wire-dark: #222;
+            --wire-green: #5CB85C;
+            --wire-orange: #F0AD4E;
+            --wire-red: #D9534F;
+            --wire-purple: #9B59B6;
+            --shadow: 2px 3px 0px rgba(0, 0, 0, 0.08);
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: var(--ui-font);
+            background: #e8e8e8;
+            color: var(--wire-dark);
+            line-height: 1.5;
+        }
+
+        /* ── Cover Page ── */
+        .cover {
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%);
+            color: white;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            text-align: center;
+            padding: 40px;
+            page-break-after: always;
+        }
+
+        .cover h1 {
+            font-size: 56px;
+            font-weight: 700;
+            margin-bottom: 8px;
+            letter-spacing: -1px;
+        }
+
+        .cover .subtitle {
+            font-size: 22px;
+            color: #8ec5fc;
+            margin-bottom: 40px;
+            font-weight: 400;
+        }
+
+        .cover .doc-title {
+            font-size: 28px;
+            font-weight: 600;
+            margin-bottom: 12px;
+            color: #ccc;
+        }
+
+        .cover .meta {
+            font-size: 15px;
+            color: #999;
+            margin-top: 30px;
+            line-height: 2;
+        }
+
+        .cover .badge {
+            display: inline-block;
+            background: rgba(78, 144, 217, 0.25);
+            border: 1px solid rgba(78, 144, 217, 0.5);
+            padding: 6px 18px;
+            border-radius: 20px;
+            font-size: 13px;
+            color: #8ec5fc;
+            margin-top: 20px;
+        }
+
+        .cover .logo-icon {
+            font-size: 80px;
+            margin-bottom: 20px;
+            opacity: 0.9;
+        }
+
+        /* ── TOC ── */
+        .toc-page {
+            background: white;
+            max-width: 900px;
+            margin: 40px auto;
+            padding: 60px;
+            border-radius: 8px;
+            box-shadow: 0 2px 20px rgba(0, 0, 0, 0.08);
+            page-break-after: always;
+        }
+
+        .toc-page h2 {
+            font-size: 28px;
+            color: var(--wire-accent);
+            margin-bottom: 30px;
+            border-bottom: 2px solid var(--wire-accent);
+            padding-bottom: 10px;
+        }
+
+        .toc-list {
+            list-style: none;
+        }
+
+        .toc-list li {
+            padding: 10px 0;
+            border-bottom: 1px dashed #ddd;
+            display: flex;
+            justify-content: space-between;
+            font-size: 15px;
+        }
+
+        .toc-list li a {
+            color: var(--wire-dark);
+            text-decoration: none;
+        }
+
+        .toc-list li a:hover {
+            color: var(--wire-accent);
+        }
+
+        .toc-list .section-num {
+            color: var(--wire-accent);
+            font-weight: 600;
+            margin-right: 10px;
+        }
+
+        .toc-list .toc-group {
+            font-weight: 600;
+            color: var(--wire-accent);
+            background: var(--wire-accent-light);
+            padding: 6px 12px;
+            margin-top: 8px;
+            border-radius: 4px;
+            border-bottom: none;
+        }
+
+        /* ── Section Title ── */
+        .section-title-page {
+            background: linear-gradient(135deg, #f0f4ff 0%, #e8f0fe 100%);
+            max-width: 1100px;
+            margin: 40px auto;
+            padding: 60px;
+            border-radius: 8px;
+            text-align: center;
+            page-break-before: always;
+            page-break-after: always;
+        }
+
+        .section-title-page h2 {
+            font-size: 36px;
+            color: var(--wire-accent);
+            margin-bottom: 10px;
+        }
+
+        .section-title-page p {
+            font-size: 16px;
+            color: #666;
+            max-width: 600px;
+            margin: 0 auto;
+        }
+
+        /* ── Wireframe Container ── */
+        .wire-page {
+            max-width: 1100px;
+            margin: 40px auto;
+            page-break-inside: avoid;
+            page-break-after: always;
+        }
+
+        .wire-header {
+            background: white;
+            padding: 20px 30px;
+            border-radius: 8px 8px 0 0;
+            border-bottom: 2px solid var(--wire-accent);
+        }
+
+        .wire-header h3 {
+            font-size: 22px;
+            color: var(--wire-dark);
+        }
+
+        .wire-header .route {
+            font-size: 13px;
+            color: var(--wire-gray);
+            font-family: monospace;
+            margin-top: 2px;
+        }
+
+        .wire-header .desc {
+            font-size: 14px;
+            color: #555;
+            margin-top: 6px;
+        }
+
+        .wire-body {
+            background: white;
+            border: 3px solid var(--wire-border);
+            border-radius: 0 0 8px 8px;
+            padding: 0;
+            position: relative;
+            overflow: hidden;
+            filter: url(#sketchy);
+        }
+
+        /* ── Wireframe Drawing Elements ── */
+        .w-frame {
+            font-family: var(--sketch-font);
+            min-height: 500px;
+            position: relative;
+            background: var(--wire-bg);
+        }
+
+        /* Browser chrome */
+        .browser-bar {
+            background: #f0f0f0;
+            border-bottom: 2px solid #ccc;
+            padding: 8px 16px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-family: var(--sketch-font);
+            font-size: 13px;
+            color: #999;
+        }
+
+        .browser-dots {
+            display: flex;
+            gap: 5px;
+        }
+
+        .browser-dots span {
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            border: 1.5px solid #bbb;
+        }
+
+        .browser-url {
+            flex: 1;
+            background: white;
+            border: 1.5px solid #ccc;
+            border-radius: 12px;
+            padding: 3px 12px;
+            font-size: 12px;
+            color: #888;
+        }
+
+        /* Sidebar */
+        .w-sidebar {
+            position: absolute;
+            left: 0;
+            top: 0;
+            bottom: 0;
+            width: 220px;
+            background: #1a1a2e;
+            color: white;
+            padding: 20px 0;
+            font-family: var(--sketch-font);
+            border-right: 2px solid #333;
+        }
+
+        .w-sidebar .brand {
+            padding: 0 16px 16px;
+            font-size: 16px;
+            font-weight: 600;
+            color: #8ec5fc;
+            border-bottom: 1px solid #333;
+            margin-bottom: 12px;
+        }
+
+        .w-sidebar .brand small {
+            display: block;
+            font-size: 10px;
+            color: #666;
+            margin-top: 2px;
+        }
+
+        .w-sidebar .nav-item {
+            padding: 10px 16px;
+            font-size: 14px;
+            color: #aaa;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            cursor: pointer;
+        }
+
+        .w-sidebar .nav-item.active {
+            background: rgba(78, 144, 217, 0.15);
+            color: #8ec5fc;
+            border-left: 3px solid #4A90D9;
+        }
+
+        .w-sidebar .nav-icon {
+            width: 16px;
+            height: 16px;
+            border: 1.5px solid currentColor;
+            border-radius: 3px;
+            display: inline-block;
+        }
+
+        .w-sidebar .version {
+            position: absolute;
+            bottom: 12px;
+            left: 16px;
+            font-size: 10px;
+            color: #555;
+        }
+
+        /* Topbar */
+        .w-topbar {
+            margin-left: 220px;
+            height: 50px;
+            background: white;
+            border-bottom: 2px solid #e0e0e0;
+            display: flex;
+            align-items: center;
+            justify-content: flex-end;
+            padding: 0 20px;
+            gap: 12px;
+            font-family: var(--sketch-font);
+        }
+
+        .w-role-badge {
+            background: var(--wire-accent-light);
+            color: var(--wire-accent);
+            padding: 2px 10px;
+            border-radius: 10px;
+            font-size: 11px;
+            font-weight: 600;
+        }
+
+        .w-avatar {
+            width: 32px;
+            height: 32px;
+            border-radius: 50%;
+            background: #ddd;
+            border: 2px solid #bbb;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 14px;
+            color: #666;
+        }
+
+        /* Content area */
+        .w-content {
+            margin-left: 220px;
+            padding: 24px;
+            font-family: var(--sketch-font);
+            min-height: 450px;
+        }
+
+        .w-content.full {
+            margin-left: 0;
+        }
+
+        /* Common elements */
+        .w-card {
+            border: 2px solid var(--wire-border);
+            border-radius: 8px;
+            background: white;
+            padding: 16px;
+            margin-bottom: 16px;
+            box-shadow: var(--shadow);
+        }
+
+        .w-card-title {
+            font-size: 15px;
+            font-weight: 600;
+            margin-bottom: 10px;
+            padding-bottom: 8px;
+            border-bottom: 1px dashed #ddd;
+        }
+
+        .w-btn {
+            display: inline-block;
+            padding: 8px 18px;
+            border: 2px solid var(--wire-border);
+            border-radius: 6px;
+            font-family: var(--sketch-font);
+            font-size: 13px;
+            background: white;
+            cursor: pointer;
+        }
+
+        .w-btn.primary {
+            background: var(--wire-accent);
+            color: white;
+            border-color: var(--wire-accent);
+        }
+
+        .w-btn.success {
+            background: var(--wire-green);
+            color: white;
+            border-color: var(--wire-green);
+        }
+
+        .w-btn.danger {
+            background: var(--wire-red);
+            color: white;
+            border-color: var(--wire-red);
+        }
+
+        .w-btn.disabled {
+            opacity: 0.4;
+        }
+
+        .w-input {
+            display: block;
+            width: 100%;
+            padding: 8px 10px;
+            border: 2px solid #ccc;
+            border-radius: 6px;
+            font-family: var(--sketch-font);
+            font-size: 13px;
+            margin: 6px 0;
+            background: var(--wire-light);
+        }
+
+        .w-select {
+            composes: w-input;
+        }
+
+        .w-label {
+            font-size: 12px;
+            font-weight: 600;
+            color: #555;
+            margin-top: 8px;
+            display: block;
+        }
+
+        .w-badge {
+            display: inline-block;
+            padding: 2px 8px;
+            border-radius: 10px;
+            font-size: 11px;
+            font-weight: 600;
+            border: 1.5px solid;
+        }
+
+        .w-badge.blue {
+            background: var(--wire-accent-light);
+            color: var(--wire-accent);
+            border-color: var(--wire-accent);
+        }
+
+        .w-badge.green {
+            background: #d4edda;
+            color: #2d6a3f;
+            border-color: #5CB85C;
+        }
+
+        .w-badge.orange {
+            background: #fff3cd;
+            color: #856404;
+            border-color: #F0AD4E;
+        }
+
+        .w-badge.red {
+            background: #f8d7da;
+            color: #721c24;
+            border-color: #D9534F;
+        }
+
+        .w-badge.purple {
+            background: #ede7f6;
+            color: #6a1b9a;
+            border-color: #9B59B6;
+        }
+
+        .w-badge.gray {
+            background: #eee;
+            color: #666;
+            border-color: #aaa;
+        }
+
+        .w-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-family: var(--sketch-font);
+            font-size: 13px;
+        }
+
+        .w-table th {
+            text-align: left;
+            padding: 8px;
+            border-bottom: 2px solid #333;
+            font-size: 12px;
+            color: #555;
+            font-weight: 600;
+        }
+
+        .w-table td {
+            padding: 8px;
+            border-bottom: 1px dashed #ddd;
+        }
+
+        .w-table tr:last-child td {
+            border-bottom: none;
+        }
+
+        .w-stat-grid {
+            display: grid;
+            gap: 16px;
+            grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+        }
+
+        .w-stat {
+            border: 2px solid var(--wire-border);
+            border-radius: 8px;
+            padding: 16px;
+            text-align: center;
+            box-shadow: var(--shadow);
+        }
+
+        .w-stat .number {
+            font-size: 32px;
+            font-weight: 700;
+            color: var(--wire-accent);
+        }
+
+        .w-stat .label {
+            font-size: 13px;
+            color: #666;
+            margin-top: 4px;
+        }
+
+        .w-grid-2 {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 16px;
+        }
+
+        .w-grid-3-1 {
+            display: grid;
+            grid-template-columns: 2fr 1fr;
+            gap: 16px;
+        }
+
+        .w-placeholder {
+            background: repeating-linear-gradient(45deg, #f8f8f8, #f8f8f8 10px, #f0f0f0 10px, #f0f0f0 20px);
+            border: 2px dashed #ccc;
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            min-height: 200px;
+            color: #999;
+            font-family: var(--sketch-font);
+            font-size: 16px;
+        }
+
+        .w-dropzone {
+            border: 3px dashed #aaa;
+            border-radius: 12px;
+            padding: 40px;
+            text-align: center;
+            background: #fafafa;
+            color: #888;
+            font-size: 14px;
+        }
+
+        .w-dropzone .icon {
+            font-size: 40px;
+            margin-bottom: 10px;
+        }
+
+        .w-chat-panel {
+            border: 2px solid var(--wire-border);
+            border-radius: 8px;
+            display: flex;
+            flex-direction: column;
+            height: 400px;
+            overflow: hidden;
+        }
+
+        .w-chat-header {
+            padding: 10px 14px;
+            border-bottom: 2px solid #eee;
+            font-weight: 600;
+            font-size: 14px;
+            background: var(--wire-light);
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .w-chat-messages {
+            flex: 1;
+            padding: 12px;
+            overflow-y: auto;
+            font-size: 13px;
+        }
+
+        .w-chat-msg {
+            margin-bottom: 10px;
+            padding: 8px 12px;
+            border-radius: 10px;
+            max-width: 85%;
+            line-height: 1.4;
+        }
+
+        .w-chat-msg.bot {
+            background: var(--wire-light);
+            border: 1.5px solid #ddd;
+        }
+
+        .w-chat-msg.user {
+            background: var(--wire-accent-light);
+            border: 1.5px solid var(--wire-accent);
+            margin-left: auto;
+        }
+
+        .w-chat-input-bar {
+            padding: 10px;
+            border-top: 2px solid #eee;
+            display: flex;
+            gap: 8px;
+        }
+
+        .w-chat-input-bar input {
+            flex: 1;
+            padding: 8px;
+            border: 2px solid #ccc;
+            border-radius: 6px;
+            font-family: var(--sketch-font);
+            font-size: 13px;
+        }
+
+        /* Flow Diagram */
+        .flow-container {
+            background: white;
+            max-width: 1100px;
+            margin: 40px auto;
+            padding: 40px;
+            border-radius: 8px;
+            box-shadow: 0 2px 20px rgba(0, 0, 0, 0.08);
+            page-break-after: always;
+        }
+
+        .flow-container h2 {
+            font-size: 28px;
+            color: var(--wire-accent);
+            margin-bottom: 30px;
+            text-align: center;
+        }
+
+        .flow-diagram {
+            font-family: var(--sketch-font);
+            font-size: 14px;
+        }
+
+        .flow-row {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 12px;
+            margin-bottom: 8px;
+        }
+
+        .flow-node {
+            padding: 12px 20px;
+            border: 2.5px solid var(--wire-border);
+            border-radius: 8px;
+            background: white;
+            text-align: center;
+            min-width: 140px;
+            box-shadow: var(--shadow);
+            position: relative;
+        }
+
+        .flow-node.start {
+            border-radius: 30px;
+            background: var(--wire-accent);
+            color: white;
+            border-color: var(--wire-accent);
+        }
+
+        .flow-node.decision {
+            transform: rotate(0deg);
+            border-color: var(--wire-orange);
+            background: #fff9e6;
+        }
+
+        .flow-node.user-flow {
+            border-color: var(--wire-accent);
+            background: #f0f7ff;
+        }
+
+        .flow-node.vendor-flow {
+            border-color: var(--wire-purple);
+            background: #f5f0ff;
+        }
+
+        .flow-node.admin-flow {
+            border-color: var(--wire-green);
+            background: #f0fff0;
+        }
+
+        .flow-node.highlight {
+            border-color: var(--wire-accent);
+            background: var(--wire-accent-light);
+            border-width: 3px;
+        }
+
+        .flow-arrow {
+            font-size: 20px;
+            color: #999;
+        }
+
+        .flow-arrow.down {
+            display: block;
+            text-align: center;
+            margin: 4px 0;
+        }
+
+        .flow-label {
+            font-size: 11px;
+            color: #888;
+            text-align: center;
+            margin-bottom: 4px;
+        }
+
+        .flow-section {
+            margin-bottom: 30px;
+            padding: 20px;
+            border: 2px dashed #ddd;
+            border-radius: 12px;
+        }
+
+        .flow-section h3 {
+            font-family: var(--sketch-font);
+            font-size: 16px;
+            color: #555;
+            margin-bottom: 16px;
+            text-align: center;
+        }
+
+        /* Annotations */
+        .annotation {
+            background: #fffde7;
+            border: 1.5px solid #f9e04b;
+            border-radius: 6px;
+            padding: 10px 14px;
+            font-family: var(--sketch-font);
+            font-size: 12px;
+            color: #666;
+            margin-top: 12px;
+        }
+
+        .annotation strong {
+            color: #333;
+        }
+
+        /* Notes section below wireframe */
+        .wire-notes {
+            background: #f9f9f9;
+            padding: 16px 24px;
+            border-top: 2px dashed #ddd;
+            font-size: 13px;
+            color: #555;
+        }
+
+        .wire-notes h4 {
+            font-size: 14px;
+            color: var(--wire-accent);
+            margin-bottom: 6px;
+        }
+
+        .wire-notes ul {
+            margin-left: 16px;
+        }
+
+        .wire-notes li {
+            margin-bottom: 4px;
+        }
+
+        /* Print styles */
+        @media print {
+            body {
+                background: white;
+            }
+
+            .wire-page,
+            .flow-container,
+            .toc-page,
+            .section-title-page {
+                box-shadow: none;
+                margin: 0;
+                max-width: 100%;
+            }
+
+            .cover {
+                min-height: 0;
+                padding: 80px 40px;
+            }
+        }
+
+        /* Sketch filter */
+        .sketch-filter {
+            position: absolute;
+            width: 0;
+            height: 0;
+        }
+
+        /* 3D viewer placeholder */
+        .w-3d-viewer {
+            background: #1a1a2e;
+            border: 2px solid #333;
+            border-radius: 8px;
+            min-height: 250px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            color: #8ec5fc;
+            font-family: var(--sketch-font);
+            position: relative;
+        }
+
+        .w-3d-viewer .grid-lines {
+            position: absolute;
+            inset: 0;
+            background:
+                linear-gradient(rgba(78, 144, 217, 0.1) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(78, 144, 217, 0.1) 1px, transparent 1px);
+            background-size: 30px 30px;
+            border-radius: 6px;
+        }
+
+        .w-3d-viewer .model-shape {
+            width: 80px;
+            height: 60px;
+            border: 3px solid #8ec5fc;
+            transform: perspective(200px) rotateX(15deg) rotateY(-25deg);
+            position: relative;
+            z-index: 1;
+        }
+
+        .w-3d-viewer .controls {
+            position: absolute;
+            bottom: 8px;
+            right: 8px;
+            font-size: 11px;
+            color: #666;
+            z-index: 1;
+        }
+
+        /* Tabs */
+        .w-tabs {
+            display: flex;
+            border-bottom: 2px solid #ddd;
+            margin-bottom: 12px;
+        }
+
+        .w-tab {
+            padding: 8px 16px;
+            font-family: var(--sketch-font);
+            font-size: 13px;
+            border: 2px solid transparent;
+            border-bottom: none;
+            cursor: pointer;
+            color: #888;
+        }
+
+        .w-tab.active {
+            border-color: #ddd;
+            border-bottom: 2px solid white;
+            margin-bottom: -2px;
+            color: var(--wire-accent);
+            font-weight: 600;
+            background: white;
+            border-radius: 6px 6px 0 0;
+        }
+
+        /* Progress */
+        .w-progress {
+            height: 8px;
+            background: #eee;
+            border-radius: 4px;
+            overflow: hidden;
+            border: 1px solid #ddd;
+        }
+
+        .w-progress-bar {
+            height: 100%;
+            background: var(--wire-accent);
+            border-radius: 4px;
+            transition: width 0.3s;
+        }
+
+        /* Operation row */
+        .w-op-row {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 8px 10px;
+            border: 1.5px solid #e0e0e0;
+            border-radius: 6px;
+            margin-bottom: 6px;
+            font-size: 13px;
+            background: #fafafa;
+        }
+
+        .w-op-row .op-num {
+            font-weight: 600;
+            color: var(--wire-accent);
+            min-width: 24px;
+        }
+
+        .w-op-row .op-name {
+            flex: 1;
+        }
+
+        .w-op-row .op-tool {
+            color: #888;
+            font-size: 11px;
+        }
+
+        .w-op-row .op-time {
+            font-weight: 600;
+            min-width: 50px;
+            text-align: right;
+        }
+
+        .w-op-row .grip {
+            color: #ccc;
+            cursor: grab;
+        }
+
+        .flex-h {
+            display: flex;
+            gap: 16px;
+        }
+
+        .flex-1 {
+            flex: 1;
+        }
+
+        .mb-12 {
+            margin-bottom: 12px;
+        }
+
+        .mb-8 {
+            margin-bottom: 8px;
+        }
+
+        .text-sm {
+            font-size: 12px;
+        }
+
+        .text-gray {
+            color: #888;
+        }
+
+        .text-center {
+            text-align: center;
+        }
+
+        .mt-16 {
+            margin-top: 16px;
+        }
+
+        .mt-8 {
+            margin-top: 8px;
+        }
+
+        .gap-8 {
+            gap: 8px;
+        }
+
+        .inline-flex {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+        }
+    </style>
+</head>
+
+<body>
+
+    <!-- SVG Filter for sketchy look -->
+    <svg class="sketch-filter">
+        <filter id="sketchy">
+            <feTurbulence type="turbulence" baseFrequency="0.03" numOctaves="4" result="noise" seed="2" />
+            <feDisplacementMap in="SourceGraphic" in2="noise" scale="1" xChannelSelector="R" yChannelSelector="G" />
+        </filter>
+    </svg>
+
+    <!-- ════════════════════════════════════════════════ -->
+    <!-- COVER PAGE -->
+    <!-- ════════════════════════════════════════════════ -->
+    <div class="cover">
+        <div class="logo-icon">⚙️</div>
+        <h1>MechAI</h1>
+        <div class="subtitle">AI-Powered CAM & RFQ Platform</div>
+        <div class="doc-title">Wireframes & Screen Flow</div>
+        <p style="color:#777; max-width:500px; font-size:14px; line-height:1.7; margin-top:10px;">
+            Complete UI wireframes for all user roles — Customer, Vendor, and Admin — covering the end-to-end workflow
+            from CAD upload to AI-generated machining plans and RFQ management.
+        </p>
+        <div class="badge">CONFIDENTIAL — Client Review Draft</div>
+        <div class="meta">
+            Version 1.0<br />
+            February 2026<br />
+            Prepared by MechAI Engineering
+        </div>
+    </div>
+
+    <!-- ════════════════════════════════════════════════ -->
+    <!-- TABLE OF CONTENTS -->
+    <!-- ════════════════════════════════════════════════ -->
+    <div class="toc-page">
+        <h2>Table of Contents</h2>
+        <ol class="toc-list">
+            <li class="toc-group">A. Screen Flow Diagram</li>
+            <li><span class="section-num">1</span><a href="#flow">Application Navigation Flow</a></li>
+
+            <li class="toc-group">B. Authentication</li>
+            <li><span class="section-num">2</span><a href="#login">Login Page</a></li>
+            <li><span class="section-num">3</span><a href="#register">Registration Page</a></li>
+
+            <li class="toc-group">C. Customer (User) Screens</li>
+            <li><span class="section-num">4</span><a href="#dashboard">Dashboard — Overview</a></li>
+            <li><span class="section-num">5</span><a href="#models">My Models — List View</a></li>
+            <li><span class="section-num">6</span><a href="#upload">Upload Model</a></li>
+            <li><span class="section-num">7</span><a href="#model-detail">Model Detail — 3D View & Features</a></li>
+            <li><span class="section-num">8</span><a href="#plan-generate">Machining Plan — Generate</a></li>
+            <li><span class="section-num">9</span><a href="#plan-editor">Machining Plan — Editor & AI Copilot</a></li>
+
+            <li class="toc-group">D. Vendor Screens</li>
+            <li><span class="section-num">10</span><a href="#vendor-dash">Vendor Dashboard</a></li>
+            <li><span class="section-num">11</span><a href="#vendor-profile">Vendor Profile</a></li>
+            <li><span class="section-num">12</span><a href="#vendor-rfqs">Vendor RFQs</a></li>
+
+            <li class="toc-group">E. Admin Screens</li>
+            <li><span class="section-num">13</span><a href="#admin-dash">Admin Dashboard</a></li>
+            <li><span class="section-num">14</span><a href="#admin-vendors">Manage Vendors</a></li>
+            <li><span class="section-num">15</span><a href="#admin-models">Platform Models</a></li>
+        </ol>
+    </div>
+
+    <!-- ════════════════════════════════════════════════ -->
+    <!-- 1. SCREEN FLOW DIAGRAM -->
+    <!-- ════════════════════════════════════════════════ -->
+    <div class="flow-container" id="flow">
+        <h2>📋 Application Screen Flow</h2>
+
+        <!-- Entry -->
+        <div class="flow-section">
+            <h3>🔐 Authentication</h3>
+            <div class="flow-row">
+                <div class="flow-node start">App Entry</div>
+                <span class="flow-arrow">→</span>
+                <div class="flow-node">Login Page</div>
+                <span class="flow-arrow">⇄</span>
+                <div class="flow-node">Register Page</div>
+            </div>
+            <div class="flow-arrow down">↓</div>
+            <div class="flow-label">Role-based redirect after authentication</div>
+            <div class="flow-row" style="margin-top:8px;">
+                <div class="flow-node user-flow">👤 /dashboard</div>
+                <div class="flow-node vendor-flow">🏭 /vendor</div>
+                <div class="flow-node admin-flow">🛡️ /admin</div>
+            </div>
+        </div>
+
+        <!-- Customer Flow -->
+        <div class="flow-section">
+            <h3>👤 Customer Flow — Core Value Journey</h3>
+            <div class="flow-row">
+                <div class="flow-node user-flow">Dashboard<br /><small>Stats overview</small></div>
+                <span class="flow-arrow">→</span>
+                <div class="flow-node user-flow">My Models<br /><small>List all uploads</small></div>
+                <span class="flow-arrow">→</span>
+                <div class="flow-node highlight">Upload Model<br /><small>Drag & drop CAD</small></div>
+            </div>
+            <div class="flow-arrow down">↓ auto-redirect on upload</div>
+            <div class="flow-row" style="margin-top:8px;">
+                <div class="flow-node highlight" style="min-width:200px;">Model Detail<br /><small>3D viewer + geometry
+                        + features</small></div>
+                <span class="flow-arrow">→</span>
+                <div class="flow-node highlight" style="min-width:200px;">Generate Plan<br /><small>Select material &
+                        machine</small></div>
+                <span class="flow-arrow">→</span>
+                <div class="flow-node highlight" style="min-width:240px;">Plan Editor + AI Copilot<br /><small>Edit ops,
+                        chat with AI, versions</small></div>
+            </div>
+            <div class="flow-arrow down">↓</div>
+            <div class="flow-row" style="margin-top:8px;">
+                <div class="flow-node user-flow">Approve Plan</div>
+                <span class="flow-arrow">→</span>
+                <div class="flow-node user-flow">Export PDF</div>
+                <span class="flow-arrow">→</span>
+                <div class="flow-node user-flow">Request RFQ</div>
+            </div>
+        </div>
+
+        <!-- Vendor Flow -->
+        <div class="flow-section">
+            <h3>🏭 Vendor Flow</h3>
+            <div class="flow-row">
+                <div class="flow-node vendor-flow">Vendor Dashboard<br /><small>RFQ stats</small></div>
+                <span class="flow-arrow">→</span>
+                <div class="flow-node vendor-flow">Profile<br /><small>Machines & capabilities</small></div>
+            </div>
+            <div style="text-align:center; margin: 8px 0;">
+                <span class="flow-arrow">↓</span>
+            </div>
+            <div class="flow-row">
+                <div class="flow-node vendor-flow" style="min-width:250px;">RFQs List<br /><small>View RFQs → Submit
+                        quotes</small></div>
+            </div>
+        </div>
+
+        <!-- Admin Flow -->
+        <div class="flow-section">
+            <h3>🛡️ Admin Flow</h3>
+            <div class="flow-row">
+                <div class="flow-node admin-flow">Admin Dashboard<br /><small>Platform stats</small></div>
+                <span class="flow-arrow">→</span>
+                <div class="flow-node admin-flow">Manage Vendors<br /><small>Approve / revoke</small></div>
+            </div>
+            <div style="text-align:center; margin: 8px 0;">
+                <span class="flow-arrow">↓</span>
+            </div>
+            <div class="flow-row">
+                <div class="flow-node admin-flow">Platform Models<br /><small>View all user models</small></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ════════════════════════════════════════════════ -->
+    <!-- SECTION: AUTHENTICATION -->
+    <!-- ════════════════════════════════════════════════ -->
+    <div class="section-title-page">
+        <h2>🔐 Authentication Screens</h2>
+        <p>Login and registration pages — the entry point for all users</p>
+    </div>
+
+    <!-- ════════════════════════════════════════════════ -->
+    <!-- 2. LOGIN PAGE -->
+    <!-- ════════════════════════════════════════════════ -->
+    <div class="wire-page" id="login">
+        <div class="wire-header">
+            <h3>Screen 2 — Login Page</h3>
+            <div class="route">Route: /login</div>
+            <div class="desc">Authentication entry point. Users enter email and password to sign in.</div>
+        </div>
+        <div class="wire-body">
+            <div class="browser-bar">
+                <div class="browser-dots"><span></span><span></span><span></span></div>
+                <div class="browser-url">mechai.app/login</div>
+            </div>
+            <div class="w-frame"
+                style="min-height:480px; display:flex; align-items:center; justify-content:center; background: #f5f7fa;">
+                <div style="width: 360px;">
+                    <div class="w-card" style="padding: 32px;">
+                        <div style="text-align:center; margin-bottom:20px;">
+                            <div style="font-size:28px; margin-bottom:4px;">⚙️</div>
+                            <div
+                                style="font-family: var(--sketch-font); font-size:20px; font-weight:600; color: var(--wire-accent);">
+                                AI-CAM-RFQ</div>
+                            <div style="font-size:13px; color:#888; margin-top:4px; font-family: var(--sketch-font);">
+                                Sign in to your account</div>
+                        </div>
+                        <label class="w-label">Email</label>
+                        <input class="w-input" type="text" placeholder="you@company.com" />
+                        <label class="w-label">Password</label>
+                        <input class="w-input" type="password" placeholder="••••••••" />
+                        <div style="margin-top: 16px;">
+                            <button class="w-btn primary" style="width:100%; padding: 10px; font-size: 14px;">Sign
+                                In</button>
+                        </div>
+                        <div
+                            style="text-align:center; margin-top:16px; font-family: var(--sketch-font); font-size:13px; color:#888;">
+                            Don't have an account? <span
+                                style="color: var(--wire-accent); text-decoration: underline; cursor: pointer;">Register</span>
+                        </div>
+                    </div>
+                    <div class="annotation" style="margin-top:16px;">
+                        <strong>📝 Notes:</strong> Error messages appear as a red banner above the form. Button shows a
+                        loading spinner during authentication. Auto-redirects if already logged in.
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ════════════════════════════════════════════════ -->
+    <!-- 3. REGISTER PAGE -->
+    <!-- ════════════════════════════════════════════════ -->
+    <div class="wire-page" id="register">
+        <div class="wire-header">
+            <h3>Screen 3 — Registration Page</h3>
+            <div class="route">Route: /register</div>
+            <div class="desc">New user sign-up with role selection (Customer or Vendor).</div>
+        </div>
+        <div class="wire-body">
+            <div class="browser-bar">
+                <div class="browser-dots"><span></span><span></span><span></span></div>
+                <div class="browser-url">mechai.app/register</div>
+            </div>
+            <div class="w-frame"
+                style="min-height:540px; display:flex; align-items:center; justify-content:center; background: #f5f7fa;">
+                <div style="width: 360px;">
+                    <div class="w-card" style="padding: 32px;">
+                        <div style="text-align:center; margin-bottom:20px;">
+                            <div style="font-size:28px; margin-bottom:4px;">⚙️</div>
+                            <div
+                                style="font-family: var(--sketch-font); font-size:20px; font-weight:600; color: var(--wire-accent);">
+                                AI-CAM-RFQ</div>
+                            <div style="font-size:13px; color:#888; margin-top:4px; font-family: var(--sketch-font);">
+                                Create your account</div>
+                        </div>
+                        <label class="w-label">Full Name</label>
+                        <input class="w-input" type="text" placeholder="John Smith" />
+                        <label class="w-label">Email</label>
+                        <input class="w-input" type="text" placeholder="you@company.com" />
+                        <label class="w-label">Password</label>
+                        <input class="w-input" type="password" placeholder="Min 8 characters" />
+                        <label class="w-label">Account Type</label>
+                        <select class="w-input" style="cursor:pointer;">
+                            <option>Customer</option>
+                            <option>Vendor</option>
+                        </select>
+                        <div style="margin-top: 16px;">
+                            <button class="w-btn primary" style="width:100%; padding: 10px; font-size: 14px;">Create
+                                Account</button>
+                        </div>
+                        <div
+                            style="text-align:center; margin-top:16px; font-family: var(--sketch-font); font-size:13px; color:#888;">
+                            Already have an account? <span
+                                style="color: var(--wire-accent); text-decoration: underline; cursor: pointer;">Sign
+                                in</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ════════════════════════════════════════════════ -->
+    <!-- SECTION: CUSTOMER SCREENS -->
+    <!-- ════════════════════════════════════════════════ -->
+    <div class="section-title-page">
+        <h2>👤 Customer Screens</h2>
+        <p>The primary user journey — from dashboard overview to AI-powered machining plan generation</p>
+    </div>
+
+    <!-- ════════════════════════════════════════════════ -->
+    <!-- 4. DASHBOARD -->
+    <!-- ════════════════════════════════════════════════ -->
+    <div class="wire-page" id="dashboard">
+        <div class="wire-header">
+            <h3>Screen 4 — Customer Dashboard</h3>
+            <div class="route">Route: /dashboard</div>
+            <div class="desc">High-level overview showing the user's uploaded model statistics.</div>
+        </div>
+        <div class="wire-body">
+            <div class="w-frame">
+                <!-- Sidebar -->
+                <div class="w-sidebar">
+                    <div class="brand">⚙️ AI-CAM-RFQ<small>Manufacturing Intelligence</small></div>
+                    <div class="nav-item active"><span class="nav-icon"></span> Dashboard</div>
+                    <div class="nav-item"><span class="nav-icon"></span> Models</div>
+                    <div class="nav-item"><span class="nav-icon"></span> Upload Model</div>
+                    <div class="version">v0.1.0 — Phase 1</div>
+                </div>
+                <!-- Topbar -->
+                <div class="w-topbar">
+                    <span class="w-role-badge">user</span>
+                    <div class="w-avatar">JS</div>
+                </div>
+                <!-- Content -->
+                <div class="w-content">
+                    <div style="font-size:20px; font-weight:600; margin-bottom:4px;">Welcome back, John 👋</div>
+                    <div style="font-size:13px; color:#888; margin-bottom:20px;">Here's an overview of your
+                        manufacturing workspace</div>
+                    <div class="w-stat-grid">
+                        <div class="w-stat">
+                            <div class="number">12</div>
+                            <div class="label">📦 Total Models</div>
+                        </div>
+                        <div class="w-stat">
+                            <div class="number" style="color: var(--wire-orange);">3</div>
+                            <div class="label">⏳ Processing</div>
+                        </div>
+                        <div class="w-stat">
+                            <div class="number" style="color: var(--wire-green);">9</div>
+                            <div class="label">✅ Ready</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ════════════════════════════════════════════════ -->
+    <!-- 5. MODELS LIST -->
+    <!-- ════════════════════════════════════════════════ -->
+    <div class="wire-page" id="models">
+        <div class="wire-header">
+            <h3>Screen 5 — My Models (List View)</h3>
+            <div class="route">Route: /models</div>
+            <div class="desc">Table listing all uploaded CAD models with status, format, and actions.</div>
+        </div>
+        <div class="wire-body">
+            <div class="w-frame">
+                <div class="w-sidebar">
+                    <div class="brand">⚙️ AI-CAM-RFQ<small>Manufacturing Intelligence</small></div>
+                    <div class="nav-item"><span class="nav-icon"></span> Dashboard</div>
+                    <div class="nav-item active"><span class="nav-icon"></span> Models</div>
+                    <div class="nav-item"><span class="nav-icon"></span> Upload Model</div>
+                    <div class="version">v0.1.0 — Phase 1</div>
+                </div>
+                <div class="w-topbar">
+                    <span class="w-role-badge">user</span>
+                    <div class="w-avatar">JS</div>
+                </div>
+                <div class="w-content">
+                    <div
+                        style="display:flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+                        <div>
+                            <div style="font-size:20px; font-weight:600;">My Models</div>
+                            <div style="font-size:13px; color:#888;">Manage your uploaded CAD files</div>
+                        </div>
+                        <button class="w-btn primary">+ Upload Model</button>
+                    </div>
+                    <div class="w-card" style="padding:0; overflow:hidden;">
+                        <table class="w-table">
+                            <thead>
+                                <tr>
+                                    <th>Name</th>
+                                    <th>Format</th>
+                                    <th>Version</th>
+                                    <th>Status</th>
+                                    <th>Visibility</th>
+                                    <th>Created</th>
+                                    <th>Action</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr>
+                                    <td>Bracket_v2</td>
+                                    <td><span class="w-badge blue">STEP</span></td>
+                                    <td>v3</td>
+                                    <td><span class="w-badge green">Ready</span></td>
+                                    <td><span class="w-badge gray">Private</span></td>
+                                    <td>Feb 20</td>
+                                    <td><button class="w-btn" style="padding:4px 12px; font-size:12px;">View →</button>
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <td>Housing_assembly</td>
+                                    <td><span class="w-badge blue">IGES</span></td>
+                                    <td>v1</td>
+                                    <td><span class="w-badge orange">Processing</span></td>
+                                    <td><span class="w-badge gray">Private</span></td>
+                                    <td>Feb 22</td>
+                                    <td><button class="w-btn" style="padding:4px 12px; font-size:12px;">View →</button>
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <td>Shaft_prototype</td>
+                                    <td><span class="w-badge purple">STL</span></td>
+                                    <td>v1</td>
+                                    <td><span class="w-badge green">Ready</span></td>
+                                    <td><span class="w-badge blue">Public</span></td>
+                                    <td>Feb 18</td>
+                                    <td><button class="w-btn" style="padding:4px 12px; font-size:12px;">View →</button>
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <td>Gear_housing</td>
+                                    <td><span class="w-badge blue">STEP</span></td>
+                                    <td>v2</td>
+                                    <td><span class="w-badge red">Failed</span></td>
+                                    <td><span class="w-badge gray">Private</span></td>
+                                    <td>Feb 15</td>
+                                    <td><button class="w-btn" style="padding:4px 12px; font-size:12px;">View →</button>
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ════════════════════════════════════════════════ -->
+    <!-- 6. UPLOAD MODEL -->
+    <!-- ════════════════════════════════════════════════ -->
+    <div class="wire-page" id="upload">
+        <div class="wire-header">
+            <h3>Screen 6 — Upload Model</h3>
+            <div class="route">Route: /models/upload</div>
+            <div class="desc">Two-column layout: drag-and-drop file upload on left, model details form on right.</div>
+        </div>
+        <div class="wire-body">
+            <div class="w-frame">
+                <div class="w-sidebar">
+                    <div class="brand">⚙️ AI-CAM-RFQ<small>Manufacturing Intelligence</small></div>
+                    <div class="nav-item"><span class="nav-icon"></span> Dashboard</div>
+                    <div class="nav-item"><span class="nav-icon"></span> Models</div>
+                    <div class="nav-item active"><span class="nav-icon"></span> Upload Model</div>
+                    <div class="version">v0.1.0 — Phase 1</div>
+                </div>
+                <div class="w-topbar">
+                    <span class="w-role-badge">user</span>
+                    <div class="w-avatar">JS</div>
+                </div>
+                <div class="w-content">
+                    <div style="font-size:20px; font-weight:600; margin-bottom:4px;">Upload CAD Model</div>
+                    <div style="font-size:13px; color:#888; margin-bottom:20px;">Upload a STEP, IGES, or STL file for
+                        analysis</div>
+                    <div class="w-grid-2">
+                        <!-- Left: File Upload -->
+                        <div class="w-card">
+                            <div class="w-card-title">📁 CAD File</div>
+                            <div class="w-dropzone">
+                                <div class="icon">📤</div>
+                                <div style="font-weight:600; margin-bottom:4px;">Drag & drop your CAD file here</div>
+                                <div style="font-size:12px; color:#aaa; margin-bottom:12px;">.step .stp .iges .igs .stl
+                                    .x_t</div>
+                                <button class="w-btn">Browse Files</button>
+                            </div>
+                            <div class="annotation" style="margin-top:12px; background:#fff3cd; border-color:#F0AD4E;">
+                                <strong>⚠️ STL Notice:</strong> STL supports viewing & RFQ only. Upload STEP/IGES for
+                                full machining intelligence.
+                            </div>
+                        </div>
+                        <!-- Right: Details -->
+                        <div class="w-card">
+                            <div class="w-card-title">📋 Model Details</div>
+                            <label class="w-label">Model Name</label>
+                            <input class="w-input" type="text" placeholder="Auto-filled from filename" />
+                            <label class="w-label">Visibility</label>
+                            <select class="w-input">
+                                <option>Private</option>
+                                <option>Public</option>
+                            </select>
+                            <div style="margin-top:20px;">
+                                <div class="w-progress mb-8">
+                                    <div class="w-progress-bar" style="width:65%;"></div>
+                                </div>
+                                <div style="font-size:12px; color:#888; text-align:center; margin-bottom:12px;">
+                                    Uploading... 65%</div>
+                                <button class="w-btn primary" style="width:100%;">Upload CAD File</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="wire-notes">
+            <h4>Upload Flow</h4>
+            <ul>
+                <li><strong>Step 1:</strong> Request signed upload URL from server</li>
+                <li><strong>Step 2:</strong> Upload file directly to cloud storage with progress</li>
+                <li><strong>Step 3:</strong> Confirm upload → triggers backend processing pipeline</li>
+                <li><strong>Auto-redirect:</strong> On success, navigates to Model Detail page</li>
+            </ul>
+        </div>
+    </div>
+
+    <!-- ════════════════════════════════════════════════ -->
+    <!-- 7. MODEL DETAIL -->
+    <!-- ════════════════════════════════════════════════ -->
+    <div class="wire-page" id="model-detail">
+        <div class="wire-header">
+            <h3>Screen 7 — Model Detail (3D View, Geometry & Features)</h3>
+            <div class="route">Route: /models/:id</div>
+            <div class="desc">Full model detail with interactive 3D viewer, geometry summary, detected features, and
+                action buttons.</div>
+        </div>
+        <div class="wire-body">
+            <div class="w-frame">
+                <div class="w-sidebar">
+                    <div class="brand">⚙️ AI-CAM-RFQ<small>Manufacturing Intelligence</small></div>
+                    <div class="nav-item"><span class="nav-icon"></span> Dashboard</div>
+                    <div class="nav-item active"><span class="nav-icon"></span> Models</div>
+                    <div class="nav-item"><span class="nav-icon"></span> Upload Model</div>
+                    <div class="version">v0.1.0 — Phase 1</div>
+                </div>
+                <div class="w-topbar">
+                    <span class="w-role-badge">user</span>
+                    <div class="w-avatar">JS</div>
+                </div>
+                <div class="w-content">
+                    <div style="font-size:20px; font-weight:600; margin-bottom:4px;">← Bracket_v2</div>
+                    <div style="font-size:13px; color:#888; margin-bottom:16px;">Model details and analysis results
+                    </div>
+
+                    <div class="w-grid-3-1">
+                        <!-- Left: Model Info + 3D Viewer -->
+                        <div>
+                            <div class="w-card">
+                                <div class="w-card-title">Model Information</div>
+                                <div
+                                    style="display:grid; grid-template-columns: repeat(3, 1fr); gap:8px; margin-bottom:16px; font-size:12px;">
+                                    <div><span style="color:#888;">Version:</span> <strong>v3</strong></div>
+                                    <div><span style="color:#888;">Status:</span> <span
+                                            class="w-badge green">Ready</span></div>
+                                    <div><span style="color:#888;">Format:</span> <span class="w-badge blue">STEP</span>
+                                    </div>
+                                    <div><span style="color:#888;">Visibility:</span> <span
+                                            class="w-badge gray">Private</span></div>
+                                    <div><span style="color:#888;">Created:</span> Feb 20, 2026</div>
+                                </div>
+                                <!-- 3D Viewer -->
+                                <div class="w-3d-viewer">
+                                    <div class="grid-lines"></div>
+                                    <div class="model-shape"></div>
+                                    <div style="margin-top:12px; font-size:14px; z-index:1;">🔄 Interactive 3D Viewer
+                                    </div>
+                                    <div style="font-size:11px; color:#666; z-index:1;">Orbit · Zoom · Pan</div>
+                                    <div class="controls">OrbitControls ◎</div>
+                                </div>
+                            </div>
+
+                            <!-- Geometry Summary -->
+                            <div class="w-card">
+                                <div class="w-card-title">📐 Geometry Summary</div>
+                                <div
+                                    style="display:grid; grid-template-columns: repeat(2, 1fr); gap: 10px; font-size: 13px;">
+                                    <div style="padding:8px; background:var(--wire-light); border-radius:6px;">
+                                        <div style="color:#888; font-size:11px;">Bounding Box</div>
+                                        <strong>120 × 80 × 45 mm</strong>
+                                    </div>
+                                    <div style="padding:8px; background:var(--wire-light); border-radius:6px;">
+                                        <div style="color:#888; font-size:11px;">Surface Area</div>
+                                        <strong>28,450 mm²</strong>
+                                    </div>
+                                    <div style="padding:8px; background:var(--wire-light); border-radius:6px;">
+                                        <div style="color:#888; font-size:11px;">Volume</div>
+                                        <strong>124,800 mm³</strong>
+                                    </div>
+                                    <div style="padding:8px; background:var(--wire-light); border-radius:6px;">
+                                        <div style="color:#888; font-size:11px;">Face Types</div>
+                                        <strong>Planar: 18 · Cyl: 6 · Cone: 2</strong>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Features -->
+                            <div class="w-card">
+                                <div class="w-card-title">🔍 Detected Features</div>
+                                <div style="font-size:13px;">
+                                    <div
+                                        style="display:flex; align-items:center; gap:8px; padding:6px 0; border-bottom:1px dashed #eee;">
+                                        <span class="w-badge blue">Hole</span>
+                                        <span style="flex:1;">Through hole — ⌀12mm, depth 45mm</span>
+                                        <span class="w-badge green" style="font-size:10px;">95%</span>
+                                    </div>
+                                    <div
+                                        style="display:flex; align-items:center; gap:8px; padding:6px 0; border-bottom:1px dashed #eee;">
+                                        <span class="w-badge purple">Pocket</span>
+                                        <span style="flex:1;">Rectangular pocket — 40×20mm, depth 8mm</span>
+                                        <span class="w-badge green" style="font-size:10px;">92%</span>
+                                    </div>
+                                    <div
+                                        style="display:flex; align-items:center; gap:8px; padding:6px 0; border-bottom:1px dashed #eee;">
+                                        <span class="w-badge orange">Slot</span>
+                                        <span style="flex:1;">T-slot — width 10mm, depth 12mm</span>
+                                        <span class="w-badge green" style="font-size:10px;">88%</span>
+                                    </div>
+                                    <div style="display:flex; align-items:center; gap:8px; padding:6px 0;">
+                                        <span class="w-badge blue">Hole</span>
+                                        <span style="flex:1;">Blind hole × 4 — ⌀6mm, depth 10mm</span>
+                                        <span class="w-badge orange" style="font-size:10px;">78%</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Right: Actions -->
+                        <div>
+                            <div class="w-card">
+                                <div class="w-card-title">⚡ Actions</div>
+                                <div style="display:flex; flex-direction:column; gap:8px;">
+                                    <button class="w-btn primary" style="width:100%;">🧠 Machining Plan</button>
+                                    <button class="w-btn" style="width:100%;">📋 Request RFQ</button>
+                                    <button class="w-btn" style="width:100%;">⬇️ Download CAD</button>
+                                    <button class="w-btn" style="width:100%;">🔗 Share Model</button>
+                                    <hr style="border:none; border-top:1px dashed #ddd; margin:4px 0;" />
+                                    <button class="w-btn danger" style="width:100%;">🗑️ Delete Model</button>
+                                </div>
+                            </div>
+                            <div class="annotation">
+                                <strong>📝 Note:</strong> "Machining Plan" is disabled for STL files (requires B-Rep
+                                data). "Request RFQ" is disabled until model status is Ready.
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ════════════════════════════════════════════════ -->
+    <!-- 8. MACHINING PLAN – GENERATE -->
+    <!-- ════════════════════════════════════════════════ -->
+    <div class="wire-page" id="plan-generate">
+        <div class="wire-header">
+            <h3>Screen 8 — Generate Machining Plan</h3>
+            <div class="route">Route: /models/:id/plan (initial state)</div>
+            <div class="desc">Material and machine selection form before AI plan generation.</div>
+        </div>
+        <div class="wire-body">
+            <div class="w-frame">
+                <div class="w-sidebar">
+                    <div class="brand">⚙️ AI-CAM-RFQ<small>Manufacturing Intelligence</small></div>
+                    <div class="nav-item"><span class="nav-icon"></span> Dashboard</div>
+                    <div class="nav-item active"><span class="nav-icon"></span> Models</div>
+                    <div class="nav-item"><span class="nav-icon"></span> Upload Model</div>
+                    <div class="version">v0.1.0 — Phase 1</div>
+                </div>
+                <div class="w-topbar">
+                    <span class="w-role-badge">user</span>
+                    <div class="w-avatar">JS</div>
+                </div>
+                <div class="w-content">
+                    <div style="font-size:20px; font-weight:600; margin-bottom:4px;">← Machining Plan — Bracket_v2</div>
+                    <div style="font-size:13px; color:#888; margin-bottom:24px;">Configure parameters to generate an
+                        AI-powered machining plan</div>
+
+                    <div style="max-width:500px; margin: 0 auto;">
+                        <div class="w-card" style="padding: 28px;">
+                            <div style="text-align:center; font-size:40px; margin-bottom:12px;">🧠</div>
+                            <div style="text-align:center; font-size:16px; font-weight:600; margin-bottom:4px;">Generate
+                                Machining Plan</div>
+                            <div style="text-align:center; font-size:12px; color:#888; margin-bottom:20px;">AI will
+                                analyze your model's geometry and create an optimized plan</div>
+
+                            <label class="w-label">Material</label>
+                            <select class="w-input">
+                                <option>Select material...</option>
+                                <option>Aluminum 6061-T6</option>
+                                <option>Aluminum 7075-T6</option>
+                                <option>Steel 1018</option>
+                                <option>Steel 4140</option>
+                                <option>Stainless Steel 304</option>
+                                <option>Stainless Steel 316</option>
+                                <option>Titanium Ti-6Al-4V</option>
+                                <option>Brass C360</option>
+                                <option>Copper C110</option>
+                                <option>Nylon 6/6</option>
+                                <option>Delrin / Acetal</option>
+                                <option>PEEK</option>
+                            </select>
+
+                            <label class="w-label">Machine Type</label>
+                            <select class="w-input">
+                                <option>3-Axis Milling</option>
+                                <option>CNC Lathe</option>
+                            </select>
+
+                            <div style="margin-top:24px;">
+                                <button class="w-btn primary" style="width:100%; padding:12px; font-size:15px;">🚀
+                                    Generate Machining Plan</button>
+                            </div>
+                        </div>
+                        <div class="annotation">
+                            <strong>📝 Notes:</strong> Generation typically takes 15-30 seconds. The AI analyzes
+                            detected features, material properties, and machine constraints to produce an optimized
+                            multi-setup plan with tool selections and time estimates.
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ════════════════════════════════════════════════ -->
+    <!-- 9. MACHINING PLAN – EDITOR + AI COPILOT -->
+    <!-- ════════════════════════════════════════════════ -->
+    <div class="wire-page" id="plan-editor">
+        <div class="wire-header">
+            <h3>Screen 9 — Machining Plan Editor + AI Copilot ⭐</h3>
+            <div class="route">Route: /models/:id/plan (plan loaded)</div>
+            <div class="desc">The core screen: edit operations, tools, and setups with a side-panel AI chat for
+                real-time plan refinement.</div>
+        </div>
+        <div class="wire-body">
+            <div class="w-frame" style="min-height:700px;">
+                <div class="w-sidebar">
+                    <div class="brand">⚙️ AI-CAM-RFQ<small>Manufacturing Intelligence</small></div>
+                    <div class="nav-item"><span class="nav-icon"></span> Dashboard</div>
+                    <div class="nav-item active"><span class="nav-icon"></span> Models</div>
+                    <div class="nav-item"><span class="nav-icon"></span> Upload Model</div>
+                    <div class="version">v0.1.0 — Phase 1</div>
+                </div>
+                <div class="w-topbar">
+                    <span class="w-role-badge">user</span>
+                    <div class="w-avatar">JS</div>
+                </div>
+                <div class="w-content">
+                    <!-- Header Bar -->
+                    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
+                        <div>
+                            <div style="font-size:18px; font-weight:600;">← Machining Plan — Bracket_v2</div>
+                            <div style="font-size:12px; color:#888;">Aluminum 6061-T6 · 3-Axis Milling</div>
+                        </div>
+                        <div style="display:flex; gap:8px; align-items:center;">
+                            <select class="w-input" style="width:120px; margin:0; padding:4px 8px; font-size:12px;">
+                                <option>Version 3 ✓</option>
+                                <option>Version 2</option>
+                                <option>Version 1</option>
+                            </select>
+                            <button class="w-btn primary" style="padding:6px 14px;">💾 Save</button>
+                            <button class="w-btn success" style="padding:6px 14px;">✅ Approve</button>
+                            <button class="w-btn" style="padding:6px 14px;">🗑️ Discard</button>
+                        </div>
+                    </div>
+
+                    <!-- Status Bar -->
+                    <div
+                        style="display:flex; gap:12px; margin-bottom:12px; font-size:12px; padding:8px 12px; background:#f0fff0; border:1.5px solid #5CB85C; border-radius:6px;">
+                        <span class="w-badge green">Draft</span>
+                        <span style="color:#666;">Last diff: <strong>+2 ops</strong>, <strong>-1 op</strong>, <strong>3
+                                tool changes</strong>, <strong>+2.5 min</strong></span>
+                    </div>
+
+                    <!-- Split Layout -->
+                    <div style="display:flex; gap:16px;">
+                        <!-- Left: Tabbed Editor -->
+                        <div style="flex:1;">
+                            <!-- Tabs -->
+                            <div class="w-tabs">
+                                <div class="w-tab active">Operations</div>
+                                <div class="w-tab">Tools</div>
+                                <div class="w-tab">Setups</div>
+                            </div>
+
+                            <!-- Setup 1 -->
+                            <div class="w-card" style="margin-bottom:8px;">
+                                <div
+                                    style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
+                                    <div style="font-size:13px; font-weight:600;">Setup 1 — Top (Z+)</div>
+                                    <span class="w-badge blue" style="font-size:10px;">4 operations</span>
+                                </div>
+                                <div class="w-op-row">
+                                    <span class="grip">⠿</span>
+                                    <span class="op-num">1.1</span>
+                                    <span class="op-name">Face Milling — Top surface</span>
+                                    <span class="op-tool">⚙ 50mm Face Mill</span>
+                                    <span class="op-time">2.5 min</span>
+                                    <span style="color:#ccc; cursor:pointer;">✏️</span>
+                                </div>
+                                <div class="w-op-row">
+                                    <span class="grip">⠿</span>
+                                    <span class="op-num">1.2</span>
+                                    <span class="op-name">Rough Pocket — Rectangular pocket</span>
+                                    <span class="op-tool">⚙ 16mm End Mill</span>
+                                    <span class="op-time">4.8 min</span>
+                                    <span style="color:#ccc; cursor:pointer;">✏️</span>
+                                </div>
+                                <div class="w-op-row">
+                                    <span class="grip">⠿</span>
+                                    <span class="op-num">1.3</span>
+                                    <span class="op-name">Finish Pocket — Rectangular pocket</span>
+                                    <span class="op-tool">⚙ 10mm End Mill</span>
+                                    <span class="op-time">3.2 min</span>
+                                    <span style="color:#ccc; cursor:pointer;">✏️</span>
+                                </div>
+                                <div class="w-op-row">
+                                    <span class="grip">⠿</span>
+                                    <span class="op-num">1.4</span>
+                                    <span class="op-name">Slot Milling — T-slot</span>
+                                    <span class="op-tool">⚙ 10mm Slot Mill</span>
+                                    <span class="op-time">2.1 min</span>
+                                    <span style="color:#ccc; cursor:pointer;">✏️</span>
+                                </div>
+                                <button class="w-btn" style="font-size:11px; padding:4px 10px; margin-top:6px;">+ Add
+                                    Operation</button>
+                            </div>
+
+                            <!-- Setup 2 -->
+                            <div class="w-card">
+                                <div
+                                    style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
+                                    <div style="font-size:13px; font-weight:600;">Setup 2 — Bottom (Z-)</div>
+                                    <span class="w-badge blue" style="font-size:10px;">2 operations</span>
+                                </div>
+                                <div class="w-op-row">
+                                    <span class="grip">⠿</span>
+                                    <span class="op-num">2.1</span>
+                                    <span class="op-name">Drilling — Through hole ⌀12mm</span>
+                                    <span class="op-tool">⚙ 12mm Drill</span>
+                                    <span class="op-time">1.0 min</span>
+                                    <span style="color:#ccc; cursor:pointer;">✏️</span>
+                                </div>
+                                <div class="w-op-row">
+                                    <span class="grip">⠿</span>
+                                    <span class="op-num">2.2</span>
+                                    <span class="op-name">Drilling — Blind holes ⌀6mm × 4</span>
+                                    <span class="op-tool">⚙ 6mm Drill</span>
+                                    <span class="op-time">1.8 min</span>
+                                    <span style="color:#ccc; cursor:pointer;">✏️</span>
+                                </div>
+                                <button class="w-btn" style="font-size:11px; padding:4px 10px; margin-top:6px;">+ Add
+                                    Operation</button>
+                            </div>
+
+                            <!-- Total + Export -->
+                            <div
+                                style="display:flex; justify-content:space-between; align-items:center; padding:12px 16px; background:var(--wire-light); border-radius:8px; border:2px solid #ddd; margin-top:8px;">
+                                <div>
+                                    <span style="font-weight:600;">Total: 6 operations</span>
+                                    <span style="color:#888; margin-left:12px;">2 setups · 5 tools</span>
+                                </div>
+                                <div style="display:flex; align-items:center; gap:16px;">
+                                    <div style="font-size:18px; font-weight:700; color: var(--wire-accent);">15.4 min
+                                    </div>
+                                    <button class="w-btn primary">📄 Download PDF</button>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Right: AI Copilot Chat -->
+                        <div style="width:320px; flex-shrink:0;">
+                            <div class="w-chat-panel" style="height:520px;">
+                                <div class="w-chat-header">
+                                    <span>🤖</span> AI Copilot
+                                    <span class="w-badge blue" style="margin-left:auto; font-size:10px;">v3</span>
+                                </div>
+                                <div class="w-chat-messages">
+                                    <div class="w-chat-msg bot">
+                                        👋 Hi! I'm your machining copilot. I can help you refine this plan. Try asking
+                                        me to:
+                                        <br />• Switch to carbide tools
+                                        <br />• Optimize for surface finish
+                                        <br />• Add a chamfer operation
+                                        <br />• Reduce cycle time
+                                    </div>
+                                    <div class="w-chat-msg user">
+                                        Switch all end mills to carbide and optimize feeds for aluminum
+                                    </div>
+                                    <div class="w-chat-msg bot">
+                                        ✅ Done! I've updated 3 tools to carbide variants and increased feed rates by
+                                        ~40% for Al 6061-T6. Changes:
+                                        <br />• Op 1.2: HSS → Carbide 16mm (feed 800→1120 mm/min)
+                                        <br />• Op 1.3: HSS → Carbide 10mm (feed 600→850 mm/min)
+                                        <br />• Estimated time: 15.4 → 11.2 min
+                                        <br /><br />
+                                        <em style="color:#888;">Review changes in the editor ←</em>
+                                    </div>
+                                    <div class="w-chat-msg user">
+                                        Add a 0.5mm chamfer to all hole edges
+                                    </div>
+                                    <div class="w-chat-msg bot" style="color:#888; font-style:italic;">
+                                        Thinking...
+                                    </div>
+                                </div>
+                                <div class="w-chat-input-bar">
+                                    <input type="text" placeholder="Ask the copilot..." />
+                                    <button class="w-btn primary" style="padding:6px 12px;">Send</button>
+                                </div>
+                            </div>
+                            <div class="annotation" style="margin-top:8px; font-size:11px;">
+                                <strong>💡 Tip:</strong> The copilot modifies the actual plan. Changes appear in the
+                                editor immediately. Use Save to persist, or Discard to revert.
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="wire-notes">
+            <h4>Key Interactions</h4>
+            <ul>
+                <li><strong>Drag & reorder:</strong> Operations can be reordered within each setup via drag handles (⠿)
+                </li>
+                <li><strong>Inline edit:</strong> Click ✏️ to expand operation details (speeds, feeds, depth of cut,
+                    etc.)</li>
+                <li><strong>Version control:</strong> Each Save or Copilot change creates a new version; switch via
+                    dropdown</li>
+                <li><strong>Dirty state:</strong> Warning shown in chat if user has unsaved manual edits before Copilot
+                    makes changes</li>
+                <li><strong>PDF export:</strong> Generates a formatted process sheet with all operations, tools, and
+                    parameters</li>
+            </ul>
+        </div>
+    </div>
+
+    <!-- ════════════════════════════════════════════════ -->
+    <!-- SECTION: VENDOR SCREENS -->
+    <!-- ════════════════════════════════════════════════ -->
+    <div class="section-title-page">
+        <h2>🏭 Vendor Screens</h2>
+        <p>Manufacturer portal for managing company profile and responding to RFQ requests</p>
+    </div>
+
+    <!-- ════════════════════════════════════════════════ -->
+    <!-- 10. VENDOR DASHBOARD -->
+    <!-- ════════════════════════════════════════════════ -->
+    <div class="wire-page" id="vendor-dash">
+        <div class="wire-header">
+            <h3>Screen 10 — Vendor Dashboard</h3>
+            <div class="route">Route: /vendor</div>
+            <div class="desc">Vendor overview with RFQ statistics and activity summary.</div>
+        </div>
+        <div class="wire-body">
+            <div class="w-frame">
+                <div class="w-sidebar" style="background:#1a0a2e;">
+                    <div class="brand" style="color:#c59bff;">⚙️ AI-CAM-RFQ<small>Vendor Portal</small></div>
+                    <div class="nav-item active"
+                        style="color:#c59bff; border-left-color:#9B59B6; background:rgba(155,89,182,0.15);"><span
+                            class="nav-icon"></span> Dashboard</div>
+                    <div class="nav-item"><span class="nav-icon"></span> Profile</div>
+                    <div class="nav-item"><span class="nav-icon"></span> RFQs <span class="w-badge red"
+                            style="margin-left:auto; font-size:9px;">3</span></div>
+                    <div class="version">v0.1.0 — Phase 1</div>
+                </div>
+                <div class="w-topbar">
+                    <span class="w-role-badge" style="background:#ede7f6; color:#9B59B6;">vendor</span>
+                    <div class="w-avatar">PM</div>
+                </div>
+                <div class="w-content">
+                    <div style="font-size:20px; font-weight:600; margin-bottom:4px;">Welcome, Precision Mfg Co. 🏭</div>
+                    <div style="font-size:13px; color:#888; margin-bottom:20px;">Your vendor activity overview</div>
+                    <div class="w-stat-grid" style="grid-template-columns: repeat(4, 1fr);">
+                        <div class="w-stat">
+                            <div class="number">24</div>
+                            <div class="label">📋 Total RFQs</div>
+                        </div>
+                        <div class="w-stat">
+                            <div class="number" style="color:var(--wire-orange);">5</div>
+                            <div class="label">⏳ Pending</div>
+                        </div>
+                        <div class="w-stat">
+                            <div class="number" style="color:var(--wire-accent);">12</div>
+                            <div class="label">💬 Quoted</div>
+                        </div>
+                        <div class="w-stat">
+                            <div class="number" style="color:var(--wire-green);">7</div>
+                            <div class="label">✅ Accepted</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ════════════════════════════════════════════════ -->
+    <!-- 11. VENDOR PROFILE -->
+    <!-- ════════════════════════════════════════════════ -->
+    <div class="wire-page" id="vendor-profile">
+        <div class="wire-header">
+            <h3>Screen 11 — Vendor Profile</h3>
+            <div class="route">Route: /vendor/profile</div>
+            <div class="desc">Company information and manufacturing capabilities form.</div>
+        </div>
+        <div class="wire-body">
+            <div class="w-frame">
+                <div class="w-sidebar" style="background:#1a0a2e;">
+                    <div class="brand" style="color:#c59bff;">⚙️ AI-CAM-RFQ<small>Vendor Portal</small></div>
+                    <div class="nav-item"><span class="nav-icon"></span> Dashboard</div>
+                    <div class="nav-item active"
+                        style="color:#c59bff; border-left-color:#9B59B6; background:rgba(155,89,182,0.15);"><span
+                            class="nav-icon"></span> Profile</div>
+                    <div class="nav-item"><span class="nav-icon"></span> RFQs <span class="w-badge red"
+                            style="margin-left:auto; font-size:9px;">3</span></div>
+                    <div class="version">v0.1.0 — Phase 1</div>
+                </div>
+                <div class="w-topbar">
+                    <span class="w-role-badge" style="background:#ede7f6; color:#9B59B6;">vendor</span>
+                    <div class="w-avatar">PM</div>
+                </div>
+                <div class="w-content">
+                    <div style="display:flex; align-items:center; gap:12px; margin-bottom:20px;">
+                        <div style="font-size:20px; font-weight:600;">Company Profile</div>
+                        <span class="w-badge green">Approved</span>
+                    </div>
+
+                    <div class="w-card" style="max-width:600px;">
+                        <div class="w-card-title">🏢 Company Information & Capabilities</div>
+
+                        <label class="w-label">Company Name</label>
+                        <input class="w-input" value="Precision Manufacturing Co." />
+
+                        <label class="w-label">Machines (comma-separated)</label>
+                        <textarea class="w-input"
+                            style="height:60px; resize:vertical;">Haas VF-2, DMG Mori NLX 2500, Mazak QTN 200</textarea>
+
+                        <label class="w-label">Materials Supported (comma-separated)</label>
+                        <textarea class="w-input"
+                            style="height:60px; resize:vertical;">Aluminum, Steel, Stainless Steel, Titanium, Brass</textarea>
+
+                        <div class="w-grid-2" style="margin-top:8px;">
+                            <div>
+                                <label class="w-label">Max Part Size</label>
+                                <input class="w-input" value="500 × 400 × 300 mm" />
+                            </div>
+                            <div>
+                                <label class="w-label">Tolerance Capability</label>
+                                <input class="w-input" value="±0.01 mm" />
+                            </div>
+                        </div>
+
+                        <div style="margin-top:20px;">
+                            <button class="w-btn primary">💾 Save Profile</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ════════════════════════════════════════════════ -->
+    <!-- 12. VENDOR RFQS -->
+    <!-- ════════════════════════════════════════════════ -->
+    <div class="wire-page" id="vendor-rfqs">
+        <div class="wire-header">
+            <h3>Screen 12 — Vendor RFQs</h3>
+            <div class="route">Route: /vendor/rfqs</div>
+            <div class="desc">List of incoming RFQ requests with ability to submit quotes.</div>
+        </div>
+        <div class="wire-body">
+            <div class="w-frame">
+                <div class="w-sidebar" style="background:#1a0a2e;">
+                    <div class="brand" style="color:#c59bff;">⚙️ AI-CAM-RFQ<small>Vendor Portal</small></div>
+                    <div class="nav-item"><span class="nav-icon"></span> Dashboard</div>
+                    <div class="nav-item"><span class="nav-icon"></span> Profile</div>
+                    <div class="nav-item active"
+                        style="color:#c59bff; border-left-color:#9B59B6; background:rgba(155,89,182,0.15);"><span
+                            class="nav-icon"></span> RFQs <span class="w-badge red"
+                            style="margin-left:auto; font-size:9px;">3</span></div>
+                    <div class="version">v0.1.0 — Phase 1</div>
+                </div>
+                <div class="w-topbar">
+                    <span class="w-role-badge" style="background:#ede7f6; color:#9B59B6;">vendor</span>
+                    <div class="w-avatar">PM</div>
+                </div>
+                <div class="w-content">
+                    <div style="font-size:20px; font-weight:600; margin-bottom:4px;">Request for Quotes</div>
+                    <div style="font-size:13px; color:#888; margin-bottom:20px;">Review and respond to incoming
+                        manufacturing requests</div>
+
+                    <div class="w-card" style="padding:0; overflow:hidden;">
+                        <table class="w-table">
+                            <thead>
+                                <tr>
+                                    <th>RFQ ID</th>
+                                    <th>Model</th>
+                                    <th>Quantity</th>
+                                    <th>Status</th>
+                                    <th>Due Date</th>
+                                    <th>Action</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr>
+                                    <td style="font-family:monospace; font-size:12px;">#RFQ-0042</td>
+                                    <td>Bracket_v2</td>
+                                    <td>500 pcs</td>
+                                    <td><span class="w-badge orange">Pending</span></td>
+                                    <td>Mar 15</td>
+                                    <td><button class="w-btn primary" style="padding:4px 12px; font-size:12px;">Submit
+                                            Quote</button></td>
+                                </tr>
+                                <tr>
+                                    <td style="font-family:monospace; font-size:12px;">#RFQ-0041</td>
+                                    <td>Shaft_prototype</td>
+                                    <td>100 pcs</td>
+                                    <td><span class="w-badge orange">Pending</span></td>
+                                    <td>Mar 10</td>
+                                    <td><button class="w-btn primary" style="padding:4px 12px; font-size:12px;">Submit
+                                            Quote</button></td>
+                                </tr>
+                                <tr>
+                                    <td style="font-family:monospace; font-size:12px;">#RFQ-0039</td>
+                                    <td>Housing_assembly</td>
+                                    <td>50 pcs</td>
+                                    <td><span class="w-badge blue">Quoted</span></td>
+                                    <td>Mar 5</td>
+                                    <td><button class="w-btn disabled"
+                                            style="padding:4px 12px; font-size:12px;">Submitted ✓</button></td>
+                                </tr>
+                                <tr>
+                                    <td style="font-family:monospace; font-size:12px;">#RFQ-0035</td>
+                                    <td>Gear_housing</td>
+                                    <td>200 pcs</td>
+                                    <td><span class="w-badge green">Accepted</span></td>
+                                    <td>Feb 28</td>
+                                    <td><button class="w-btn disabled" style="padding:4px 12px; font-size:12px;">Won
+                                            🎉</button></td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ════════════════════════════════════════════════ -->
+    <!-- SECTION: ADMIN SCREENS -->
+    <!-- ════════════════════════════════════════════════ -->
+    <div class="section-title-page">
+        <h2>🛡️ Admin Screens</h2>
+        <p>Platform administration for managing vendors, monitoring models, and overseeing operations</p>
+    </div>
+
+    <!-- ════════════════════════════════════════════════ -->
+    <!-- 13. ADMIN DASHBOARD -->
+    <!-- ════════════════════════════════════════════════ -->
+    <div class="wire-page" id="admin-dash">
+        <div class="wire-header">
+            <h3>Screen 13 — Admin Dashboard</h3>
+            <div class="route">Route: /admin</div>
+            <div class="desc">Platform-wide management overview with key metrics.</div>
+        </div>
+        <div class="wire-body">
+            <div class="w-frame">
+                <div class="w-sidebar" style="background:#0a1a0e;">
+                    <div class="brand" style="color:#5CB85C;">⚙️ AI-CAM-RFQ<small>Admin Console</small></div>
+                    <div class="nav-item active"
+                        style="color:#5CB85C; border-left-color:#5CB85C; background:rgba(92,184,92,0.15);"><span
+                            class="nav-icon"></span> Dashboard</div>
+                    <div class="nav-item"><span class="nav-icon"></span> Vendors</div>
+                    <div class="nav-item"><span class="nav-icon"></span> Models</div>
+                    <div class="version">v0.1.0 — Phase 1</div>
+                </div>
+                <div class="w-topbar">
+                    <span class="w-role-badge" style="background:#d4edda; color:#2d6a3f;">admin</span>
+                    <div class="w-avatar">AD</div>
+                </div>
+                <div class="w-content">
+                    <div style="font-size:20px; font-weight:600; margin-bottom:4px;">Admin Dashboard 🛡️</div>
+                    <div style="font-size:13px; color:#888; margin-bottom:20px;">Platform management overview</div>
+                    <div class="w-stat-grid" style="grid-template-columns: repeat(4, 1fr);">
+                        <div class="w-stat">
+                            <div class="number">18</div>
+                            <div class="label">🏭 Vendors</div>
+                            <div style="font-size:11px; color:#888; margin-top:4px;">12 approved</div>
+                        </div>
+                        <div class="w-stat">
+                            <div class="number">156</div>
+                            <div class="label">📦 Models</div>
+                            <div style="font-size:11px; color:#888; margin-top:4px;">132 ready</div>
+                        </div>
+                        <div class="w-stat">
+                            <div class="number">89</div>
+                            <div class="label">📋 RFQs</div>
+                            <div style="font-size:11px; color:#888; margin-top:4px;">7 pending</div>
+                        </div>
+                        <div class="w-stat">
+                            <div class="number" style="color:var(--wire-orange);">6</div>
+                            <div class="label">⚠️ Pending Approvals</div>
+                            <div style="font-size:11px; color:#888; margin-top:4px;">vendors awaiting review</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ════════════════════════════════════════════════ -->
+    <!-- 14. ADMIN VENDORS -->
+    <!-- ════════════════════════════════════════════════ -->
+    <div class="wire-page" id="admin-vendors">
+        <div class="wire-header">
+            <h3>Screen 14 — Manage Vendors</h3>
+            <div class="route">Route: /admin/vendors</div>
+            <div class="desc">Review vendor registrations, approve or revoke vendor access.</div>
+        </div>
+        <div class="wire-body">
+            <div class="w-frame">
+                <div class="w-sidebar" style="background:#0a1a0e;">
+                    <div class="brand" style="color:#5CB85C;">⚙️ AI-CAM-RFQ<small>Admin Console</small></div>
+                    <div class="nav-item"><span class="nav-icon"></span> Dashboard</div>
+                    <div class="nav-item active"
+                        style="color:#5CB85C; border-left-color:#5CB85C; background:rgba(92,184,92,0.15);"><span
+                            class="nav-icon"></span> Vendors</div>
+                    <div class="nav-item"><span class="nav-icon"></span> Models</div>
+                    <div class="version">v0.1.0 — Phase 1</div>
+                </div>
+                <div class="w-topbar">
+                    <span class="w-role-badge" style="background:#d4edda; color:#2d6a3f;">admin</span>
+                    <div class="w-avatar">AD</div>
+                </div>
+                <div class="w-content">
+                    <div style="font-size:20px; font-weight:600; margin-bottom:4px;">Manage Vendors</div>
+                    <div style="font-size:13px; color:#888; margin-bottom:20px;">Review and manage vendor registrations
+                        and capabilities</div>
+
+                    <div class="w-card" style="padding:0; overflow:hidden;">
+                        <table class="w-table">
+                            <thead>
+                                <tr>
+                                    <th>Company</th>
+                                    <th>Machines</th>
+                                    <th>Materials</th>
+                                    <th>Max Size</th>
+                                    <th>Tolerance</th>
+                                    <th>Status</th>
+                                    <th>Action</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr>
+                                    <td><strong>Precision Mfg Co.</strong></td>
+                                    <td><span class="w-badge gray" style="font-size:10px;">Haas VF-2</span> <span
+                                            class="w-badge gray" style="font-size:10px;">+2</span></td>
+                                    <td><span class="w-badge gray" style="font-size:10px;">Al</span> <span
+                                            class="w-badge gray" style="font-size:10px;">Steel</span> <span
+                                            class="w-badge gray" style="font-size:10px;">+3</span></td>
+                                    <td style="font-size:12px;">500×400×300</td>
+                                    <td>±0.01mm</td>
+                                    <td><span class="w-badge green">Approved</span></td>
+                                    <td><button class="w-btn danger"
+                                            style="padding:4px 10px; font-size:11px;">Revoke</button></td>
+                                </tr>
+                                <tr>
+                                    <td><strong>QuickParts Inc.</strong></td>
+                                    <td><span class="w-badge gray" style="font-size:10px;">DMG Mori</span> <span
+                                            class="w-badge gray" style="font-size:10px;">+1</span></td>
+                                    <td><span class="w-badge gray" style="font-size:10px;">Al</span> <span
+                                            class="w-badge gray" style="font-size:10px;">Ti</span></td>
+                                    <td style="font-size:12px;">300×300×200</td>
+                                    <td>±0.02mm</td>
+                                    <td><span class="w-badge orange">Pending</span></td>
+                                    <td><button class="w-btn success"
+                                            style="padding:4px 10px; font-size:11px;">Approve</button></td>
+                                </tr>
+                                <tr>
+                                    <td><strong>MetalWorks Ltd.</strong></td>
+                                    <td><span class="w-badge gray" style="font-size:10px;">Mazak</span> <span
+                                            class="w-badge gray" style="font-size:10px;">+3</span></td>
+                                    <td><span class="w-badge gray" style="font-size:10px;">Steel</span> <span
+                                            class="w-badge gray" style="font-size:10px;">SS</span> <span
+                                            class="w-badge gray" style="font-size:10px;">+1</span></td>
+                                    <td style="font-size:12px;">800×600×400</td>
+                                    <td>±0.005mm</td>
+                                    <td><span class="w-badge green">Approved</span></td>
+                                    <td><button class="w-btn danger"
+                                            style="padding:4px 10px; font-size:11px;">Revoke</button></td>
+                                </tr>
+                                <tr>
+                                    <td><strong>NanoMachining</strong></td>
+                                    <td><span class="w-badge gray" style="font-size:10px;">Kern Micro</span></td>
+                                    <td><span class="w-badge gray" style="font-size:10px;">Ti</span> <span
+                                            class="w-badge gray" style="font-size:10px;">PEEK</span></td>
+                                    <td style="font-size:12px;">100×100×50</td>
+                                    <td>±0.001mm</td>
+                                    <td><span class="w-badge orange">Pending</span></td>
+                                    <td><button class="w-btn success"
+                                            style="padding:4px 10px; font-size:11px;">Approve</button></td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ════════════════════════════════════════════════ -->
+    <!-- 15. ADMIN MODELS -->
+    <!-- ════════════════════════════════════════════════ -->
+    <div class="wire-page" id="admin-models">
+        <div class="wire-header">
+            <h3>Screen 15 — Platform Models (Admin View)</h3>
+            <div class="route">Route: /admin/models</div>
+            <div class="desc">Read-only overview of all CAD models uploaded across the platform.</div>
+        </div>
+        <div class="wire-body">
+            <div class="w-frame">
+                <div class="w-sidebar" style="background:#0a1a0e;">
+                    <div class="brand" style="color:#5CB85C;">⚙️ AI-CAM-RFQ<small>Admin Console</small></div>
+                    <div class="nav-item"><span class="nav-icon"></span> Dashboard</div>
+                    <div class="nav-item"><span class="nav-icon"></span> Vendors</div>
+                    <div class="nav-item active"
+                        style="color:#5CB85C; border-left-color:#5CB85C; background:rgba(92,184,92,0.15);"><span
+                            class="nav-icon"></span> Models</div>
+                    <div class="version">v0.1.0 — Phase 1</div>
+                </div>
+                <div class="w-topbar">
+                    <span class="w-role-badge" style="background:#d4edda; color:#2d6a3f;">admin</span>
+                    <div class="w-avatar">AD</div>
+                </div>
+                <div class="w-content">
+                    <div style="font-size:20px; font-weight:600; margin-bottom:4px;">Platform Models</div>
+                    <div style="font-size:13px; color:#888; margin-bottom:20px;">All CAD models across the platform
+                    </div>
+
+                    <div class="w-card" style="padding:0; overflow:hidden;">
+                        <table class="w-table">
+                            <thead>
+                                <tr>
+                                    <th>ID</th>
+                                    <th>Name</th>
+                                    <th>Owner</th>
+                                    <th>Version</th>
+                                    <th>Status</th>
+                                    <th>Visibility</th>
+                                    <th>Created</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr>
+                                    <td style="font-family:monospace; font-size:11px; color:#888;">a1b2c3d4</td>
+                                    <td>Bracket_v2</td>
+                                    <td>John Smith</td>
+                                    <td>v3</td>
+                                    <td><span class="w-badge green">Ready</span></td>
+                                    <td><span class="w-badge gray">Private</span></td>
+                                    <td>Feb 20</td>
+                                </tr>
+                                <tr>
+                                    <td style="font-family:monospace; font-size:11px; color:#888;">e5f6g7h8</td>
+                                    <td>Housing_assembly</td>
+                                    <td>Jane Doe</td>
+                                    <td>v1</td>
+                                    <td><span class="w-badge orange">Processing</span></td>
+                                    <td><span class="w-badge gray">Private</span></td>
+                                    <td>Feb 22</td>
+                                </tr>
+                                <tr>
+                                    <td style="font-family:monospace; font-size:11px; color:#888;">i9j0k1l2</td>
+                                    <td>Shaft_prototype</td>
+                                    <td>Bob Wilson</td>
+                                    <td>v1</td>
+                                    <td><span class="w-badge green">Ready</span></td>
+                                    <td><span class="w-badge blue">Public</span></td>
+                                    <td>Feb 18</td>
+                                </tr>
+                                <tr>
+                                    <td style="font-family:monospace; font-size:11px; color:#888;">m3n4o5p6</td>
+                                    <td>Impeller_casting</td>
+                                    <td>Lisa Chen</td>
+                                    <td>v2</td>
+                                    <td><span class="w-badge green">Ready</span></td>
+                                    <td><span class="w-badge gray">Private</span></td>
+                                    <td>Feb 16</td>
+                                </tr>
+                                <tr>
+                                    <td style="font-family:monospace; font-size:11px; color:#888;">q7r8s9t0</td>
+                                    <td>Gear_housing</td>
+                                    <td>John Smith</td>
+                                    <td>v2</td>
+                                    <td><span class="w-badge red">Failed</span></td>
+                                    <td><span class="w-badge gray">Private</span></td>
+                                    <td>Feb 15</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ════════════════════════════════════════════════ -->
+    <!-- SUMMARY PAGE -->
+    <!-- ════════════════════════════════════════════════ -->
+    <div class="flow-container" style="page-break-before: always;">
+        <h2>📊 Screen Inventory Summary</h2>
+        <div style="font-family: var(--sketch-font);">
+            <table class="w-table" style="font-size:14px;">
+                <thead>
+                    <tr>
+                        <th>#</th>
+                        <th>Screen Name</th>
+                        <th>Route</th>
+                        <th>Role</th>
+                        <th>Key Purpose</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td>1</td>
+                        <td><strong>Login</strong></td>
+                        <td>/login</td>
+                        <td><span class="w-badge gray">Public</span></td>
+                        <td>Email/password sign-in</td>
+                    </tr>
+                    <tr>
+                        <td>2</td>
+                        <td><strong>Register</strong></td>
+                        <td>/register</td>
+                        <td><span class="w-badge gray">Public</span></td>
+                        <td>Account creation with role selection</td>
+                    </tr>
+                    <tr>
+                        <td>3</td>
+                        <td><strong>Dashboard</strong></td>
+                        <td>/dashboard</td>
+                        <td><span class="w-badge blue">Customer</span></td>
+                        <td>Model upload stats overview</td>
+                    </tr>
+                    <tr>
+                        <td>4</td>
+                        <td><strong>My Models</strong></td>
+                        <td>/models</td>
+                        <td><span class="w-badge blue">Customer</span></td>
+                        <td>List & manage uploaded CAD files</td>
+                    </tr>
+                    <tr>
+                        <td>5</td>
+                        <td><strong>Upload Model</strong></td>
+                        <td>/models/upload</td>
+                        <td><span class="w-badge blue">Customer</span></td>
+                        <td>Drag-drop CAD upload with metadata</td>
+                    </tr>
+                    <tr>
+                        <td>6</td>
+                        <td><strong>Model Detail</strong></td>
+                        <td>/models/:id</td>
+                        <td><span class="w-badge blue">Customer</span></td>
+                        <td>3D view, geometry, features, actions</td>
+                    </tr>
+                    <tr>
+                        <td>7</td>
+                        <td><strong>Generate Plan</strong></td>
+                        <td>/models/:id/plan</td>
+                        <td><span class="w-badge blue">Customer</span></td>
+                        <td>Material & machine selection form</td>
+                    </tr>
+                    <tr>
+                        <td>8</td>
+                        <td><strong>Plan Editor</strong></td>
+                        <td>/models/:id/plan</td>
+                        <td><span class="w-badge blue">Customer</span></td>
+                        <td>Ops editor + AI Copilot chat ⭐</td>
+                    </tr>
+                    <tr>
+                        <td>9</td>
+                        <td><strong>Vendor Dashboard</strong></td>
+                        <td>/vendor</td>
+                        <td><span class="w-badge purple">Vendor</span></td>
+                        <td>RFQ activity stats</td>
+                    </tr>
+                    <tr>
+                        <td>10</td>
+                        <td><strong>Vendor Profile</strong></td>
+                        <td>/vendor/profile</td>
+                        <td><span class="w-badge purple">Vendor</span></td>
+                        <td>Company info & capabilities form</td>
+                    </tr>
+                    <tr>
+                        <td>11</td>
+                        <td><strong>Vendor RFQs</strong></td>
+                        <td>/vendor/rfqs</td>
+                        <td><span class="w-badge purple">Vendor</span></td>
+                        <td>View & respond to RFQ requests</td>
+                    </tr>
+                    <tr>
+                        <td>12</td>
+                        <td><strong>Admin Dashboard</strong></td>
+                        <td>/admin</td>
+                        <td><span class="w-badge green">Admin</span></td>
+                        <td>Platform-wide metrics</td>
+                    </tr>
+                    <tr>
+                        <td>13</td>
+                        <td><strong>Manage Vendors</strong></td>
+                        <td>/admin/vendors</td>
+                        <td><span class="w-badge green">Admin</span></td>
+                        <td>Approve/revoke vendor access</td>
+                    </tr>
+                    <tr>
+                        <td>14</td>
+                        <td><strong>Platform Models</strong></td>
+                        <td>/admin/models</td>
+                        <td><span class="w-badge green">Admin</span></td>
+                        <td>Read-only view of all models</td>
+                    </tr>
+                </tbody>
+            </table>
+
+            <div
+                style="margin-top: 30px; padding: 20px; border: 2px solid var(--wire-accent); border-radius: 8px; background: var(--wire-accent-light);">
+                <div style="font-size: 16px; font-weight: 600; color: var(--wire-accent); margin-bottom: 8px;">🎯 Core
+                    Value Flow</div>
+                <div style="font-size: 15px; color: #333; line-height: 2;">
+                    <strong>Upload CAD</strong> → <strong>View 3D Model + Geometry + Features</strong> →
+                    <strong>Generate AI Machining Plan</strong> → <strong>Refine with AI Copilot</strong> →
+                    <strong>Approve & Export PDF</strong> → <strong>Request RFQ from Vendors</strong>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Footer -->
+    <div style="text-align:center; padding:40px; color:#999; font-size:13px; font-family: var(--sketch-font);">
+        <div>⚙️ MechAI (AI-CAM-RFQ) — Wireframes v1.0</div>
+        <div style="margin-top:4px;">February 2026 · Confidential</div>
+        <div style="margin-top:8px; font-size:11px;">Open this file in a browser and use Print → Save as PDF to export
+            for sharing</div>
+    </div>
+
+</body>
+
+</html>

@@ -98,3 +98,13 @@ export interface PlanUpdateResponse {
     diff: PlanDiff;
     feedback_id: string;
 }
+
+export interface VersionSummary {
+    plan_id: string;
+    version: number;
+    approved: boolean;
+    approved_by: string | null;
+    created_at: string;
+    estimated_time: number;
+    operation_count: number;
+}

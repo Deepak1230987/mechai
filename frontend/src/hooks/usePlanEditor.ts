@@ -1,5 +1,5 @@
 import { useState, useCallback, useRef, useEffect } from "react";
-import { getLatestPlan, updatePlan, approvePlan, generatePlan } from "@/lib/planning-api";
+import { getLatestPlan, getVersion, updatePlan, approvePlan, generatePlan } from "@/lib/planning-api";
 import type { GeneratePlanRequest } from "@/lib/planning-api";
 import type {
     MachiningPlan,
@@ -65,6 +65,9 @@ export interface PlanEditorActions {
 
     /** Reset editable plan to original (discard changes). */
     discard: () => void;
+
+    /** Load a specific version for the current model. */
+    loadVersion: (modelId: string, versionNum: number) => Promise<void>;
 }
 
 export type UsePlanEditorReturn = PlanEditorState & PlanEditorActions;
@@ -319,6 +322,24 @@ export function usePlanEditor(): UsePlanEditorReturn {
         }
     }, [originalPlan]);
 
+    // ── Load specific version ────────────────────────────────────────────
+    const loadVersion = useCallback(async (modelId: string, versionNum: number) => {
+        setLoading(true);
+        setError(null);
+        try {
+            const plan = await getVersion(modelId, versionNum);
+            setOriginalPlan(structuredClone(plan));
+            setEditablePlan(structuredClone(plan));
+            setDirty(false);
+            setLastDiff(null);
+            planIdRef.current = plan.plan_id;
+        } catch (err) {
+            setError(err instanceof Error ? err.message : "Failed to load version");
+        } finally {
+            setLoading(false);
+        }
+    }, []);
+
     // ── Warn on navigation ──────────────────────────────────────────────
     useEffect(() => {
         if (!dirty) return;
@@ -353,5 +374,6 @@ export function usePlanEditor(): UsePlanEditorReturn {
         save,
         approve,
         discard,
+        loadVersion,
     };
 }
