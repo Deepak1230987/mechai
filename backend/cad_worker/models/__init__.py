@@ -61,6 +61,19 @@ class ModelGeometry(Base):
 
     feature_ready: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
 
+    # Phase A: Manufacturing Geometry Intelligence Engine
+    # Stores the full ManufacturingGeometryReport as JSONB
+    manufacturing_intelligence_report: Mapped[dict | None] = mapped_column(
+        JSON,
+        nullable=True,
+        default=None,
+        comment="Full ManufacturingGeometryReport (Phase A intelligence)",
+    )
+    intelligence_ready: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, default=False,
+        comment="True when manufacturing intelligence report is available",
+    )
+
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         default=lambda: datetime.now(timezone.utc),

@@ -43,8 +43,12 @@ from cad_worker.services.db_service import (
     save_geometry_result,
     update_model_status,
     save_features,
+    save_intelligence_report,
 )
 from cad_worker.services.storage_service import download_file
+from cad_worker.intelligence_orchestrator import (
+    generate_manufacturing_geometry_report,
+)
 
 logger = logging.getLogger("cad_worker.worker")
 settings = get_settings()
@@ -119,6 +123,33 @@ async def process_message(model_id: str, storage_path: str) -> None:
                 f"[{model_id}] Skipping feature recognition "
                 f"(geometry_type={geometry_result.geometry_type})"
             )
+
+        # ── 6c. Manufacturing Intelligence (BRep only) ──────────────────
+        if geometry_result.geometry_type == "BREP":
+            try:
+                logger.info(
+                    f"[{model_id}] Running manufacturing intelligence pipeline..."
+                )
+                # brep_shape was loaded in step 6b — reuse it
+                intelligence_report = await asyncio.to_thread(
+                    generate_manufacturing_geometry_report,
+                    brep_shape,
+                    model_id,
+                )
+                # Serialize to dict for JSONB storage
+                report_dict = intelligence_report.model_dump(mode='json')
+                await save_intelligence_report(model_id, report_dict)
+                logger.info(
+                    f"[{model_id}] Manufacturing intelligence complete: "
+                    f"complexity={intelligence_report.complexity_score.value} "
+                    f"({intelligence_report.complexity_score.level})"
+                )
+            except Exception as intel_err:
+                logger.error(
+                    f"[{model_id}] Manufacturing intelligence FAILED "
+                    f"(non-blocking): {intel_err}",
+                    exc_info=True,
+                )
 
         # ── 7. Generate glTF ─────────────────────────────────────────────
         glb_data = await _generate_gltf(model_id, local_path, ext)

@@ -131,3 +131,40 @@ async def save_features(
             f"[{model_id}] {len(saved_ids)} features saved to DB"
         )
         return saved_ids
+
+
+async def save_intelligence_report(
+    model_id: str, report_dict: dict
+) -> None:
+    """
+    Persist the ManufacturingGeometryReport JSONB to the ModelGeometry record.
+
+    Updates the existing geometry record (created by save_geometry_result)
+    with the intelligence report and sets intelligence_ready=True.
+
+    Args:
+        model_id: UUID string of the CAD model.
+        report_dict: The ManufacturingGeometryReport serialized as dict
+                     (via .model_dump(mode='json')).
+    """
+    async with async_session_factory() as session:
+        result = await session.execute(
+            select(ModelGeometry).where(ModelGeometry.model_id == model_id)
+        )
+        geometry = result.scalar_one_or_none()
+
+        if not geometry:
+            logger.error(
+                f"[{model_id}] No ModelGeometry record found — "
+                f"cannot save intelligence report"
+            )
+            return
+
+        geometry.manufacturing_intelligence_report = report_dict
+        geometry.intelligence_ready = True
+
+        await session.commit()
+        logger.info(
+            f"[{model_id}] Manufacturing intelligence report saved to DB"
+        )
+

@@ -1,0 +1,281 @@
+# AI‑CAM Digital Manufacturing Platform Architecture (Industrial Grade)
+
+---
+
+# 1. Real‑World Machining Process (Ground Truth Model)
+
+This platform must model the actual industrial machining lifecycle.
+
+## 1.1 Design & Engineering Phase
+
+* CAD model creation (solid model)
+* Technical drawing generation
+* GD&T definition
+* Surface finish specification
+* Material selection
+* Batch size & production intent
+
+## 1.2 Process Planning Phase (Core Platform Focus)
+
+A process planner determines:
+
+### A. Raw Material Selection
+
+* Plate / Bar / Billet / Casting
+* Stock allowance per face
+* Material grade
+
+### B. Machine Selection
+
+* 3‑Axis Milling
+* Lathe
+* Mill‑Turn
+* Machine capability vs tolerance
+
+### C. Workholding Strategy
+
+* Vise
+* Fixture plate
+* Soft jaws
+* 3‑jaw chuck
+* Custom fixtures
+
+### D. Setup Planning
+
+* Number of setups
+* Orientation per setup
+* Datum selection
+* Flip requirements
+
+### E. Operation Planning
+
+* Roughing
+* Semi‑finishing
+* Finishing
+* Drilling
+* Reaming
+* Tapping
+* Chamfering
+* Deburring
+
+### F. Tool Selection
+
+* Tool diameter
+* Flute count
+* Coating
+* Stick‑out length
+* Material compatibility
+
+### G. Cutting Parameters
+
+* RPM
+* Feed rate
+* Depth of cut
+* Step over
+* Coolant
+
+### H. Toolpath Strategy
+
+* Pocketing (zig‑zag / spiral)
+* Contour
+* Helical entry
+* Peck drilling
+
+### I. Inspection Planning
+
+* Critical dimensions
+* Surface finish verification
+* CMM plan
+
+## 1.3 Machining Execution
+
+* Setup mounting
+* Tool loading
+* Program execution
+* Monitoring
+* Adjustment
+
+## 1.4 Post Processing
+
+* Deburring
+* Cleaning
+* Final inspection
+* Packaging
+
+---
+
+# 2. Digital Platform Architecture
+
+## 2.1 High‑Level System Architecture
+
+Frontend → API Gateway → Microservices
+
+Microservices:
+
+* Auth Service
+* CAD Service
+* AI Service
+* RFQ Service
+* Community Service
+
+Infrastructure:
+
+* Cloud Storage (CAD + glTF)
+* Pub/Sub (job orchestration)
+* CAD Worker (geometry processing)
+* Cloud SQL (PostgreSQL)
+
+---
+
+# 3. CAD Intelligence Layer (Upgrade Target: Phase A)
+
+## 3.1 Geometry Extraction (Current)
+
+* BRep parsing (STEP/IGES)
+* Mesh parsing (STL)
+* Bounding box
+* Volume
+* Surface classification
+
+## 3.2 Required Enhancements
+
+### A. Full Geometry Metadata
+
+Store:
+
+* Volume
+* Surface area
+* Bounding box
+* Face orientation groups
+* Edge adjacency graph
+* Wall thickness map
+* Draft angle detection
+* Undercut detection
+* Thin wall detection
+* Sharp internal corner detection
+* Mass properties
+
+### B. Spatial Feature Mapping
+
+Each feature must include:
+
+* 3D position
+* Face reference
+* Normal vector
+* Feature depth
+* Accessibility direction
+
+### C. Stock Suggestion Engine
+
+* Minimum bounding block
+* Add machining allowance
+* Suggest raw stock size
+
+### D. Datum Detection Engine
+
+* Largest planar face
+* Symmetry axes
+* Stable base candidate
+
+### E. Manufacturability Analysis
+
+Flag:
+
+* Deep narrow slots
+* High aspect ratio holes
+* Tool reach issues
+* Undercuts
+* Small internal radii
+
+### F. Complexity Score
+
+Based on:
+
+* Feature count
+* Setup count estimate
+* Tool changes
+* Accessibility constraints
+
+---
+
+# 4. AI Process Brain (Future Phase B)
+
+Responsibilities:
+
+* Setup planning reasoning
+* Alternative strategies
+* Tool change optimization
+* Risk explanation
+* Cost impact estimation
+
+Plan must include:
+
+* Deterministic base plan
+* AI reasoning overlay
+* Alternatives
+* Risk flags
+* Manufacturability warnings
+
+---
+
+# 5. Conversational Copilot (Future Phase C)
+
+Capabilities:
+
+* General machining Q&A
+* Model‑specific discussion
+* Plan modification requests
+* Diff preview before applying
+* User consent required before change
+* Context memory (model + plan aware)
+
+---
+
+# 6. Visual Manufacturing UI (Future Phase D)
+
+Enhancements:
+
+* Feature highlighting in 3D viewer
+* Operation‑to‑geometry mapping
+* Setup orientation visualization
+* Tool engagement preview
+
+---
+
+# 7. Industrial Process Sheet Export
+
+PDF must include:
+
+* Part metadata
+* 3D snapshot
+* Raw stock recommendation
+* Setup plan
+* Operation table
+* Tool list
+* Estimated machining time
+* Risk notes
+* Revision history
+* Approval signature block
+
+---
+
+# 8. Current Implementation Focus
+
+We now begin with:
+
+PHASE A — CAD Worker Intelligence Upgrade
+
+Goal:
+Transform CAD Worker from geometry parser into Manufacturing Geometry Intelligence Engine.
+
+This includes:
+
+* Spatial feature mapping
+* Stock suggestion
+* Manufacturability flags
+* Datum detection
+* Complexity scoring
+
+---
+
+END OF ARCHITECTURE DOCUMENT
