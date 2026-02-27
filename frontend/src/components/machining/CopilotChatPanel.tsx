@@ -107,7 +107,8 @@ export function CopilotChatPanel({
         const copilotMsg: ChatMessageData = {
           id: `copilot_${Date.now()}`,
           role: "copilot",
-          content: result.message || "Something went wrong processing your message.",
+          content:
+            result.message || "Something went wrong processing your message.",
           timestamp: new Date(),
         };
         setMessages((prev) => [...prev, copilotMsg]);
@@ -116,7 +117,9 @@ export function CopilotChatPanel({
         const copilotMsg: ChatMessageData = {
           id: `copilot_${Date.now()}`,
           role: "copilot",
-          content: result.explanation || "I've drafted a plan update. Click below to apply it.",
+          content:
+            result.explanation ||
+            "I've drafted a plan update. Click below to apply it.",
           proposedPlan: result.proposed_plan,
           timestamp: new Date(),
         };
@@ -176,7 +179,10 @@ export function CopilotChatPanel({
             MechAI Copilot
           </span>
         </div>
-        <Badge variant="outline" className="border-indigo-500/30 bg-indigo-500/10 font-mono text-xs text-indigo-300">
+        <Badge
+          variant="outline"
+          className="border-indigo-500/30 bg-indigo-500/10 font-mono text-xs text-indigo-300"
+        >
           v{version}
         </Badge>
       </div>
@@ -199,7 +205,10 @@ export function CopilotChatPanel({
             const prev = messages[i - 1];
             const isGrouped = prev && prev.role === msg.role;
             return (
-              <div key={msg.id} className={isGrouped ? "-mt-2" : "mt-2 first:mt-0"}>
+              <div
+                key={msg.id}
+                className={isGrouped ? "-mt-2" : "mt-2 first:mt-0"}
+              >
                 <ChatMessage message={msg} onApplyProposal={onPlanProposed} />
               </div>
             );
@@ -230,7 +239,7 @@ export function CopilotChatPanel({
             className="min-h-10 max-h-40 resize-y rounded-xl border-white/10 bg-background/50 text-sm focus-visible:ring-indigo-500/50 focus-visible:border-indigo-400/40 transition-all"
             rows={1}
             disabled={sending}
-            style={{ minHeight: 40, maxHeight: 160, overflow: 'auto' }}
+            style={{ minHeight: 40, maxHeight: 160, overflow: "auto" }}
             autoFocus
           />
           <Button
