@@ -9,6 +9,7 @@ import type {
     PlanUpdateRequest,
     PlanUpdateResponse,
     PlanApproveRequest,
+    VersionSummary,
 } from "@/types/machining";
 
 /** Request payload for plan generation. */
@@ -51,6 +52,27 @@ export async function generatePlan(
     return data;
 }
 
+// ─── Version Navigation ──────────────────────────────────────────────────────
+
+/** Fetch lightweight summaries of all plan versions for a model. */
+export async function listVersions(modelId: string): Promise<VersionSummary[]> {
+    const { data } = await api.get<VersionSummary[]>(
+        `/planning/${modelId}/versions`,
+    );
+    return data;
+}
+
+/** Fetch a specific plan version by version number. */
+export async function getVersion(
+    modelId: string,
+    versionNum: number,
+): Promise<MachiningPlan> {
+    const { data } = await api.get<MachiningPlan>(
+        `/planning/${modelId}/version/${versionNum}`,
+    );
+    return data;
+}
+
 /** Submit a human edit — creates a new immutable version. */
 export async function updatePlan(
     planId: string,
@@ -73,4 +95,55 @@ export async function approvePlan(
         payload,
     );
     return data;
+}
+
+// ─── Copilot Chat ────────────────────────────────────────────────────────────
+
+/** Request payload for chat refinement. */
+export interface ChatRequest {
+    user_message: string;
+}
+
+/** Response from the copilot chat endpoint. */
+export interface ChatResponse {
+    explanation: string;
+    machining_plan: MachiningPlan;
+    version: number;
+}
+
+/** Send a message to the Machining Copilot to refine the plan. */
+export async function chatRefinePlan(
+    planId: string,
+    payload: ChatRequest,
+): Promise<ChatResponse> {
+    const { data } = await api.post<ChatResponse>(
+        `/planning/${planId}/chat`,
+        payload,
+    );
+    return data;
+}
+
+// ─── PDF Export ──────────────────────────────────────────────────────────────
+
+/** Request payload for PDF export. */
+export interface ExportRequest {
+    company_name?: string;
+    part_name?: string;
+    include_narrative?: boolean;
+}
+
+/**
+ * Export the machining plan as a PDF process sheet.
+ * Returns a Blob that can be downloaded in the browser.
+ */
+export async function exportPlanPdf(
+    planId: string,
+    payload: ExportRequest = {},
+): Promise<Blob> {
+    const { data } = await api.post(
+        `/planning/${planId}/export`,
+        payload,
+        { responseType: "blob" },
+    );
+    return data as Blob;
 }

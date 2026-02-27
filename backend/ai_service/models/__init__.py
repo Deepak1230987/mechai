@@ -81,6 +81,12 @@ class MachiningPlan(Base):
         default=None,
         comment="Timestamp of approval (nullable until approved)",
     )
+    process_summary: Mapped[Optional[str]] = mapped_column(
+        Text,
+        nullable=True,
+        default=None,
+        comment="LLM-generated manufacturing narrative (markdown)",
+    )
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         default=lambda: datetime.now(timezone.utc),
