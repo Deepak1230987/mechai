@@ -2,6 +2,10 @@
 .env.local
 .env.*.local
 .env.example
+.env
+.env.*
+backend/.env
+frontend/.env
 
 # ─── Python ─────────────────────────────────────────────────────
 __pycache__/

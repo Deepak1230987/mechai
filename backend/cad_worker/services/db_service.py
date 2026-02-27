@@ -1,8 +1,27 @@
 """
 Database service for CAD Worker.
 
-Handles writing geometry results, feature results, and updating model status.
-No authentication logic. No API routes. Pure DB operations.
+Handles writing geometry results, feature results, intelligence reports,
+and updating model status. No authentication logic. No API routes.
+Pure DB operations.
+
+TRANSACTION GUARANTEES
+======================
+Each function uses its own async session. The intelligence report and
+its denormalized columns are persisted in a SINGLE transaction — if the
+commit fails, neither the JSONB nor the columns are written, preventing
+inconsistency.
+
+DATA FLOW
+=========
+  save_geometry_result() → Creates ModelGeometry row (step 6 in worker)
+  save_features()        → Creates ModelFeature rows (step 6b in worker)
+  save_intelligence_report() → Updates ModelGeometry with:
+    • manufacturing_intelligence_report (JSONB)
+    • intelligence_ready = True
+    • intelligence_partial (from engine_status)
+    • Denormalized columns: stock_type, complexity_*, counts, engine_status
+  update_model_status()  → Sets CADModel.status (step 8 in worker)
 """
 
 from __future__ import annotations
@@ -134,18 +153,26 @@ async def save_features(
 
 
 async def save_intelligence_report(
-    model_id: str, report_dict: dict
+    model_id: str,
+    report_dict: dict,
+    engine_status: dict | None = None,
 ) -> None:
     """
-    Persist the ManufacturingGeometryReport JSONB to the ModelGeometry record.
+    Persist the ManufacturingGeometryReport and denormalized columns.
 
-    Updates the existing geometry record (created by save_geometry_result)
-    with the intelligence report and sets intelligence_ready=True.
+    Updates the existing ModelGeometry record (created by save_geometry_result)
+    in a SINGLE transaction:
+      1. manufacturing_intelligence_report = full JSONB
+      2. intelligence_ready = True
+      3. intelligence_partial = True if any engine FAILED
+      4. Denormalized columns extracted from the JSONB
 
     Args:
         model_id: UUID string of the CAD model.
-        report_dict: The ManufacturingGeometryReport serialized as dict
+        report_dict: ManufacturingGeometryReport serialized as dict
                      (via .model_dump(mode='json')).
+        engine_status: Optional engine-by-engine status dict from orchestrator.
+                       Keys: engine names, values: "OK" or "FAILED: ..."
     """
     async with async_session_factory() as session:
         result = await session.execute(
@@ -160,11 +187,55 @@ async def save_intelligence_report(
             )
             return
 
+        # ── 1. Full JSONB report ────────────────────────────────────────
         geometry.manufacturing_intelligence_report = report_dict
         geometry.intelligence_ready = True
 
-        await session.commit()
-        logger.info(
-            f"[{model_id}] Manufacturing intelligence report saved to DB"
-        )
+        # ── 2. Partial report flag ──────────────────────────────────────
+        # If any engine has "FAILED" in its status → partial report
+        is_partial = False
+        if engine_status:
+            is_partial = any("FAILED" in v for v in engine_status.values())
+        geometry.intelligence_partial = is_partial
 
+        # ── 3. Denormalized query columns ───────────────────────────────
+        # Extract from the report_dict to avoid JSONB path queries later.
+        # Each extraction is guarded with .get() to handle partial reports.
+
+        # Stock type
+        stock_rec = report_dict.get("stock_recommendation")
+        if stock_rec and isinstance(stock_rec, dict):
+            geometry.stock_type = stock_rec.get("type")
+
+        # Complexity
+        complexity = report_dict.get("complexity_score")
+        if complexity and isinstance(complexity, dict):
+            geometry.complexity_value = complexity.get("value")
+            geometry.complexity_level = complexity.get("level")
+
+        # Feature count
+        features = report_dict.get("features")
+        if features and isinstance(features, list):
+            geometry.intelligence_feature_count = len(features)
+
+        # Warning count
+        mfg = report_dict.get("manufacturability_analysis")
+        if mfg and isinstance(mfg, dict):
+            warnings = mfg.get("warnings")
+            if warnings and isinstance(warnings, list):
+                geometry.intelligence_warning_count = len(warnings)
+
+        # Engine status
+        geometry.intelligence_engine_status = engine_status
+
+        # ── Single commit for all columns ───────────────────────────────
+        await session.commit()
+
+        logger.info(
+            f"[{model_id}] Intelligence report saved: "
+            f"stock={geometry.stock_type}, "
+            f"complexity={geometry.complexity_value} ({geometry.complexity_level}), "
+            f"features={geometry.intelligence_feature_count}, "
+            f"warnings={geometry.intelligence_warning_count}, "
+            f"partial={is_partial}"
+        )

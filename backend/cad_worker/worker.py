@@ -131,14 +131,16 @@ async def process_message(model_id: str, storage_path: str) -> None:
                     f"[{model_id}] Running manufacturing intelligence pipeline..."
                 )
                 # brep_shape was loaded in step 6b — reuse it
-                intelligence_report = await asyncio.to_thread(
+                intelligence_report, engine_status = await asyncio.to_thread(
                     generate_manufacturing_geometry_report,
                     brep_shape,
                     model_id,
                 )
                 # Serialize to dict for JSONB storage
                 report_dict = intelligence_report.model_dump(mode='json')
-                await save_intelligence_report(model_id, report_dict)
+                await save_intelligence_report(
+                    model_id, report_dict, engine_status=engine_status
+                )
                 logger.info(
                     f"[{model_id}] Manufacturing intelligence complete: "
                     f"complexity={intelligence_report.complexity_score.value} "

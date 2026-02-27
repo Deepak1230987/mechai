@@ -82,7 +82,7 @@ _TOLERANCE = 1e-6
 def generate_manufacturing_geometry_report(
     shape,
     model_id: str,
-) -> ManufacturingGeometryReport:
+) -> tuple[ManufacturingGeometryReport, dict]:
     """
     Run the full manufacturing intelligence pipeline on a BRep shape.
 
@@ -99,7 +99,9 @@ def generate_manufacturing_geometry_report(
         model_id: UUID string of the CAD model.
 
     Returns:
-        ManufacturingGeometryReport (always valid, possibly partial).
+        Tuple of:
+          - ManufacturingGeometryReport (always valid, possibly partial)
+          - engine_status dict ({engine_name: "OK" | "FAILED: ..." | "SKIPPED ..."})
     """
     pipeline_start = time.monotonic()
     logger.info(f"[{model_id}] Starting manufacturing intelligence pipeline...")
@@ -163,7 +165,7 @@ def generate_manufacturing_geometry_report(
             manufacturability_analysis, complexity_score,
         )
         _self_validate(model_id, report)
-        return report
+        return report, engine_status
 
     # ── Step 2: Topology Graph (REQUIRED for steps 4-8) ─────────────────
     topology_ok = False
@@ -321,7 +323,7 @@ def generate_manufacturing_geometry_report(
         + (f", FAILED: {failed_engines}" if failed_engines else "")
     )
 
-    return report
+    return report, engine_status
 
 
 def _assemble_report(
