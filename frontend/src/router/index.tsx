@@ -12,6 +12,7 @@ import { DashboardPage } from "@/pages/dashboard/DashboardPage";
 import { ModelsPage } from "@/pages/dashboard/ModelsPage";
 import { ModelUploadPage } from "@/pages/dashboard/ModelUploadPage";
 import { ModelDetailPage } from "@/pages/dashboard/ModelDetailPage";
+import { MachiningPlanPage } from "@/pages/dashboard/MachiningPlanPage";
 
 // Vendor pages
 import { VendorDashboardPage } from "@/pages/vendor/VendorDashboardPage";
@@ -72,6 +73,14 @@ export const router = createBrowserRouter([
         element: (
           <RoleGuard allowedRoles={["USER"]}>
             <ModelDetailPage />
+          </RoleGuard>
+        ),
+      },
+      {
+        path: "/models/:modelId/plan",
+        element: (
+          <RoleGuard allowedRoles={["USER"]}>
+            <MachiningPlanPage />
           </RoleGuard>
         ),
       },

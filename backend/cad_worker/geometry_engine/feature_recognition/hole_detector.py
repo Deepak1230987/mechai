@@ -50,40 +50,40 @@ class HoleDetector(FeatureDetectorBase):
 
     def _detect_impl(self, shape: Any) -> list[FeatureResult]:
         from OCP.TopExp import TopExp_Explorer
-        from OCP.TopAbs import TopAbs_FACE, TopAbs_EDGE
+        from OCP.TopAbs import TopAbs_EDGE
         from OCP.TopoDS import TopoDS
-        from OCP.BRep import BRep_Tool
-        from OCP.GeomAdaptor import GeomAdaptor_Surface
         from OCP.BRepAdaptor import BRepAdaptor_Curve
         from OCP.GeomAbs import GeomAbs_Cylinder, GeomAbs_Circle
 
+        from cad_worker.geometry_engine.feature_recognition.face_iterator import iter_faces
+
         candidates: list[dict] = []
-        explorer = TopExp_Explorer(shape, TopAbs_FACE)
 
-        while explorer.More():
-            face = TopoDS.Face_s(explorer.Current())
-            surface = BRep_Tool.Surface_s(face)
-
-            if surface is None:
-                explorer.Next()
+        for fi in iter_faces(shape):
+            if fi.effective_type != GeomAbs_Cylinder:
                 continue
 
-            adaptor = GeomAdaptor_Surface(surface)
-
-            if adaptor.GetType() != GeomAbs_Cylinder:
-                explorer.Next()
-                continue
-
-            # Extract cylinder properties
-            cylinder = adaptor.Cylinder()
-            radius = cylinder.Radius()
-            axis = cylinder.Axis()
-            axis_dir = axis.Direction()
-            axis_loc = axis.Location()
+            # ── Extract cylinder properties ──────────────────────────────
+            # Native analytic cylinder → use adaptor directly
+            # Classified BSpline → use fitted parameters
+            if fi.bspline_radius is not None:
+                # BSpline-classified cylinder
+                radius = fi.bspline_radius
+                axis_dir_dict = fi.bspline_axis or {"x": 0, "y": 0, "z": 1}
+                axis_loc_dict = fi.bspline_location or {"x": 0, "y": 0, "z": 0}
+            else:
+                # Native OCC cylinder
+                cylinder = fi.adaptor.Cylinder()
+                radius = cylinder.Radius()
+                axis = cylinder.Axis()
+                axis_dir = axis.Direction()
+                axis_loc = axis.Location()
+                axis_dir_dict = {"x": axis_dir.X(), "y": axis_dir.Y(), "z": axis_dir.Z()}
+                axis_loc_dict = {"x": axis_loc.X(), "y": axis_loc.Y(), "z": axis_loc.Z()}
 
             # Validate boundary edges — look for circular edges
             has_circular_edge = False
-            edge_explorer = TopExp_Explorer(face, TopAbs_EDGE)
+            edge_explorer = TopExp_Explorer(fi.face, TopAbs_EDGE)
             z_values: list[float] = []
 
             while edge_explorer.More():
@@ -97,26 +97,24 @@ class HoleDetector(FeatureDetectorBase):
                     first = curve_adaptor.Value(curve_adaptor.FirstParameter())
                     last = curve_adaptor.Value(curve_adaptor.LastParameter())
 
-                    # Project onto cylinder axis direction
                     for pt in (first, last):
-                        # Vector from axis location to point
-                        dx = pt.X() - axis_loc.X()
-                        dy = pt.Y() - axis_loc.Y()
-                        dz = pt.Z() - axis_loc.Z()
-                        # Dot product with axis direction
+                        dx = pt.X() - axis_loc_dict["x"]
+                        dy = pt.Y() - axis_loc_dict["y"]
+                        dz = pt.Z() - axis_loc_dict["z"]
                         proj = (
-                            dx * axis_dir.X()
-                            + dy * axis_dir.Y()
-                            + dz * axis_dir.Z()
+                            dx * axis_dir_dict["x"]
+                            + dy * axis_dir_dict["y"]
+                            + dz * axis_dir_dict["z"]
                         )
                         z_values.append(proj)
                 except Exception:
-                    pass  # Skip edges that can't be adapted
+                    pass
 
                 edge_explorer.Next()
 
-            if not has_circular_edge:
-                explorer.Next()
+            # For BSpline-classified cylinders, relax the circular-edge
+            # requirement since edge representations may differ from IGES
+            if not has_circular_edge and fi.bspline_radius is None:
                 continue
 
             # Compute depth along axis
@@ -129,19 +127,17 @@ class HoleDetector(FeatureDetectorBase):
                 "diameter": round(2.0 * radius, 6),
                 "depth": round(depth, 6),
                 "axis": {
-                    "x": round(axis_dir.X(), 6),
-                    "y": round(axis_dir.Y(), 6),
-                    "z": round(axis_dir.Z(), 6),
+                    "x": round(axis_dir_dict["x"], 6),
+                    "y": round(axis_dir_dict["y"], 6),
+                    "z": round(axis_dir_dict["z"], 6),
                 },
                 "location": {
-                    "x": round(axis_loc.X(), 6),
-                    "y": round(axis_loc.Y(), 6),
-                    "z": round(axis_loc.Z(), 6),
+                    "x": round(axis_loc_dict["x"], 6),
+                    "y": round(axis_loc_dict["y"], 6),
+                    "z": round(axis_loc_dict["z"], 6),
                 },
             }
             candidates.append(candidate)
-
-            explorer.Next()
 
         # De-duplicate holes with same axis, location, and radius
         unique_holes = self._deduplicate(candidates)

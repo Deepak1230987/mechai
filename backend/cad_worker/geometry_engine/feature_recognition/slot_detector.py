@@ -47,51 +47,51 @@ class SlotDetector(FeatureDetectorBase):
             return []
 
     def _detect_impl(self, shape: Any) -> list[FeatureResult]:
-        from OCP.TopExp import TopExp_Explorer
-        from OCP.TopAbs import TopAbs_FACE
-        from OCP.TopoDS import TopoDS
-        from OCP.BRep import BRep_Tool
-        from OCP.GeomAdaptor import GeomAdaptor_Surface
         from OCP.GeomAbs import GeomAbs_Plane
         from OCP.Bnd import Bnd_Box
         from OCP.BRepBndLib import BRepBndLib
 
+        from cad_worker.geometry_engine.feature_recognition.face_iterator import iter_faces
+
         # ── Step 1: Collect planar faces ─────────────────────────────────
         planar_faces: list[dict] = []
-        explorer = TopExp_Explorer(shape, TopAbs_FACE)
 
-        while explorer.More():
-            face = TopoDS.Face_s(explorer.Current())
-            surface = BRep_Tool.Surface_s(face)
+        for fi in iter_faces(shape):
+            if fi.effective_type != GeomAbs_Plane:
+                continue
 
-            if surface is not None:
-                adaptor = GeomAdaptor_Surface(surface)
-                if adaptor.GetType() == GeomAbs_Plane:
-                    plane = adaptor.Plane()
-                    normal = plane.Axis().Direction()
-                    location = plane.Location()
+            # Get normal and plane_d
+            if fi.bspline_normal is not None:
+                normal_tuple = (
+                    fi.bspline_normal["x"],
+                    fi.bspline_normal["y"],
+                    fi.bspline_normal["z"],
+                )
+                plane_d = fi.bspline_plane_d or 0.0
+            else:
+                plane = fi.adaptor.Plane()
+                normal = plane.Axis().Direction()
+                location = plane.Location()
+                normal_tuple = (normal.X(), normal.Y(), normal.Z())
+                plane_d = (
+                    location.X() * normal.X()
+                    + location.Y() * normal.Y()
+                    + location.Z() * normal.Z()
+                )
 
-                    plane_d = (
-                        location.X() * normal.X()
-                        + location.Y() * normal.Y()
-                        + location.Z() * normal.Z()
-                    )
+            face_bbox = Bnd_Box()
+            BRepBndLib.Add_s(fi.face, face_bbox)
+            bxmin, bymin, bzmin, bxmax, bymax, bzmax = face_bbox.Get()
 
-                    face_bbox = Bnd_Box()
-                    BRepBndLib.Add_s(face, face_bbox)
-                    bxmin, bymin, bzmin, bxmax, bymax, bzmax = face_bbox.Get()
-
-                    planar_faces.append({
-                        "face": face,
-                        "normal": (normal.X(), normal.Y(), normal.Z()),
-                        "plane_d": plane_d,
-                        "bbox": {
-                            "xmin": bxmin, "ymin": bymin, "zmin": bzmin,
-                            "xmax": bxmax, "ymax": bymax, "zmax": bzmax,
-                        },
-                    })
-
-            explorer.Next()
+            planar_faces.append({
+                "face": fi.face,
+                "normal": normal_tuple,
+                "plane_d": plane_d,
+                "bbox": {
+                    "xmin": bxmin, "ymin": bymin, "zmin": bzmin,
+                    "xmax": bxmax, "ymax": bymax, "zmax": bzmax,
+                },
+            })
 
         if len(planar_faces) < 2:
             return []
