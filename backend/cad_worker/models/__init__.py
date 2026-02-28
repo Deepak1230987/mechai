@@ -11,6 +11,7 @@ TABLE RELATIONSHIPS
      │     • bounding_box, volume, surface_area, face counts
      │     • manufacturing_intelligence_report (JSONB)
      │     • denormalized query columns (stock_type, complexity_*, etc.)
+     │     • Phase B columns (flip/multi-axis flags, hole types, machining classes)
      └── ModelFeature[] (cad_worker)    ← raw detected features
            • type, dimensions, depth, diameter, axis, confidence
 
@@ -33,13 +34,23 @@ DENORMALIZED COLUMNS RATIONALE
 The JSONB report stores the complete intelligence data. However, querying
 JSONB for filtering/sorting is expensive. We denormalize frequently-queried
 fields into dedicated columns:
-  • stock_type         → for RFQ filtering ("show all BAR stock parts")
-  • complexity_value   → for RFQ sorting ("most complex first")
-  • complexity_level   → for dashboard ("X HIGH parts pending")
-  • intelligence_partial → for quality monitoring ("partial reports")
-  • intelligence_feature_count → for quick stats
-  • intelligence_warning_count → for DFM flags
-  • intelligence_engine_status → for debugging pipeline failures
+
+  Phase A columns:
+    • stock_type         → for RFQ filtering ("show all BAR stock parts")
+    • complexity_value   → for RFQ sorting ("most complex first")
+    • complexity_level   → for dashboard ("X HIGH parts pending")
+    • intelligence_partial → for quality monitoring ("partial reports")
+    • intelligence_feature_count → for quick stats
+    • intelligence_warning_count → for DFM flags
+    • intelligence_engine_status → for debugging pipeline failures
+
+  Phase B columns:
+    • intelligence_chamfer_count → operation count estimation
+    • intelligence_fillet_count  → finishing pass estimation
+    • intelligence_flip_required → setup planning ("needs 2-setup")
+    • intelligence_multi_axis_required → machine routing ("needs 5-axis")
+    • intelligence_hole_types    → tool set planning (JSON breakdown)
+    • intelligence_machining_classes → operation grouping (JSON breakdown)
 
 These are populated by db_service.save_intelligence_report() at the same
 time as the JSONB — single transaction, no sync issues.
@@ -174,6 +185,47 @@ class ModelGeometry(Base):
         comment="Per-engine pipeline status for debugging",
     )
 
+    # ── Phase B Denormalized Columns ────────────────────────────────────
+    # These enable Phase B planning queries without JSONB parsing.
+
+    # Chamfer and fillet counts for operation count estimation
+    intelligence_chamfer_count: Mapped[int] = mapped_column(
+        Integer, nullable=False, default=0,
+        comment="Number of detected chamfer features",
+    )
+    intelligence_fillet_count: Mapped[int] = mapped_column(
+        Integer, nullable=False, default=0,
+        comment="Number of detected fillet features",
+    )
+
+    # Setup planning flags — critical for quoting and scheduling
+    # "Show all parts requiring flip" → WHERE intelligence_flip_required = TRUE
+    intelligence_flip_required: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, default=False, index=True,
+        comment="True if any feature requires part flip (multi-setup)",
+    )
+
+    # Machine routing — determines which CNC machines can produce this part
+    # "Show all 5-axis parts" → WHERE intelligence_multi_axis_required = TRUE
+    intelligence_multi_axis_required: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, default=False, index=True,
+        comment="True if any feature requires 4-axis or 5-axis machining",
+    )
+
+    # Hole subtype breakdown for tool set planning
+    # e.g., {"THROUGH": 3, "BLIND": 2, "COUNTERBORE": 1}
+    intelligence_hole_types: Mapped[dict | None] = mapped_column(
+        JSON, nullable=True, default=None,
+        comment="Hole subtype counts: {THROUGH: N, BLIND: N, ...}",
+    )
+
+    # Machining class breakdown for operation grouping
+    # e.g., {"DRILL": 5, "ROUGH": 2, "CHAMFER": 3, "FINISH": 1}
+    intelligence_machining_classes: Mapped[dict | None] = mapped_column(
+        JSON, nullable=True, default=None,
+        comment="Machining class counts: {DRILL: N, ROUGH: N, ...}",
+    )
+
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         default=lambda: datetime.now(timezone.utc),
@@ -185,7 +237,9 @@ class ModelGeometry(Base):
             f"<ModelGeometry id={self.id} model_id={self.model_id} "
             f"type={self.geometry_type} feature_ready={self.feature_ready} "
             f"intel_ready={self.intelligence_ready} "
-            f"partial={self.intelligence_partial}>"
+            f"partial={self.intelligence_partial} "
+            f"flip={self.intelligence_flip_required} "
+            f"multi_axis={self.intelligence_multi_axis_required}>"
         )
 
 
@@ -216,7 +270,7 @@ class ModelFeature(Base):
     )
     type: Mapped[str] = mapped_column(
         SAEnum(
-            "HOLE", "POCKET", "SLOT", "TURN_PROFILE",
+            "HOLE", "POCKET", "SLOT", "TURN_PROFILE", "CHAMFER", "FILLET",
             name="feature_type_enum",
         ),
         nullable=False,

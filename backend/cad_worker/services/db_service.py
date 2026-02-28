@@ -228,6 +228,52 @@ async def save_intelligence_report(
         # Engine status
         geometry.intelligence_engine_status = engine_status
 
+        # ── 4. Phase B denormalized columns ──────────────────────────────
+        # Extract from features list for efficient SQL queries.
+        features = report_dict.get("features")
+        if features and isinstance(features, list):
+            # Chamfer and fillet counts
+            geometry.intelligence_chamfer_count = sum(
+                1 for f in features
+                if isinstance(f, dict) and f.get("type") == "CHAMFER"
+            )
+            geometry.intelligence_fillet_count = sum(
+                1 for f in features
+                if isinstance(f, dict) and f.get("type") == "FILLET"
+            )
+
+            # Setup planning: any feature requires flip?
+            geometry.intelligence_flip_required = any(
+                isinstance(f, dict) and f.get("requires_flip") is True
+                for f in features
+            )
+
+            # Machine routing: any feature requires multi-axis?
+            geometry.intelligence_multi_axis_required = any(
+                isinstance(f, dict) and f.get("requires_multi_axis") is True
+                for f in features
+            )
+
+            # Hole subtype breakdown: {"THROUGH": 3, "BLIND": 2, ...}
+            hole_types: dict[str, int] = {}
+            for f in features:
+                if isinstance(f, dict) and f.get("type") == "HOLE":
+                    subtype = f.get("hole_subtype")
+                    if subtype:
+                        hole_types[subtype] = hole_types.get(subtype, 0) + 1
+            geometry.intelligence_hole_types = hole_types if hole_types else None
+
+            # Machining class breakdown: {"DRILL": 5, "ROUGH": 2, ...}
+            class_counts: dict[str, int] = {}
+            for f in features:
+                if isinstance(f, dict):
+                    mc = f.get("machining_class")
+                    if mc:
+                        class_counts[mc] = class_counts.get(mc, 0) + 1
+            geometry.intelligence_machining_classes = (
+                class_counts if class_counts else None
+            )
+
         # ── Single commit for all columns ───────────────────────────────
         await session.commit()
 
@@ -237,5 +283,10 @@ async def save_intelligence_report(
             f"complexity={geometry.complexity_value} ({geometry.complexity_level}), "
             f"features={geometry.intelligence_feature_count}, "
             f"warnings={geometry.intelligence_warning_count}, "
+            f"chamfers={geometry.intelligence_chamfer_count}, "
+            f"fillets={geometry.intelligence_fillet_count}, "
+            f"flip={geometry.intelligence_flip_required}, "
+            f"multi_axis={geometry.intelligence_multi_axis_required}, "
             f"partial={is_partial}"
         )
+

@@ -35,7 +35,7 @@ class FeatureResult:
     surface_finish: str | None = None
     confidence: float = 0.0
 
-    _VALID_TYPES = {"HOLE", "POCKET", "SLOT", "TURN_PROFILE"}
+    _VALID_TYPES = {"HOLE", "POCKET", "SLOT", "TURN_PROFILE", "CHAMFER", "FILLET"}
 
     def __post_init__(self) -> None:
         if self.type not in self._VALID_TYPES:

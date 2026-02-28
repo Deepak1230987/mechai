@@ -23,6 +23,8 @@ from cad_worker.geometry_engine.feature_recognition.hole_detector import HoleDet
 from cad_worker.geometry_engine.feature_recognition.pocket_detector import PocketDetector
 from cad_worker.geometry_engine.feature_recognition.slot_detector import SlotDetector
 from cad_worker.geometry_engine.feature_recognition.lathe_detector import LatheDetector
+from cad_worker.geometry_engine.feature_recognition.chamfer_detector import ChamferDetector
+from cad_worker.geometry_engine.feature_recognition.fillet_detector import FilletDetector
 
 logger = logging.getLogger("cad_worker.feature_factory")
 
@@ -32,6 +34,8 @@ _DETECTORS: list[type[FeatureDetectorBase]] = [
     PocketDetector,
     SlotDetector,
     LatheDetector,
+    ChamferDetector,
+    FilletDetector,
 ]
 
 

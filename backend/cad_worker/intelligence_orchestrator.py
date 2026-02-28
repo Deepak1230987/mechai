@@ -242,7 +242,7 @@ def generate_manufacturing_geometry_report(
                 exc_info=True,
             )
 
-        # Step 6: Datum Detection
+        # Step 6: Datum Detection (moved before enhancement steps)
         try:
             from cad_worker.intelligence.datum_detector import detect_datums
             datum_candidates = detect_datums(topology_graph)
@@ -256,7 +256,77 @@ def generate_manufacturing_geometry_report(
                 f"[{model_id}] ✗ Datum detection FAILED: {e}", exc_info=True
             )
 
-        # Step 7: Manufacturability Analysis (uses datum_candidates if available)
+        # ── Phase B Enhancement Steps (non-critical, wrapped in try/except) ──
+
+        # Step 6a: Hole Classification (classifies HOLE subtypes)
+        try:
+            from cad_worker.geometry_engine.feature_recognition.hole_classifier import (
+                classify_holes,
+            )
+            spatial_features = classify_holes(
+                spatial_features, geometry_summary, topology_graph
+            )
+            engine_status["hole_classification"] = "OK"
+            hole_count = sum(
+                1 for f in spatial_features
+                if f.type == "HOLE" and f.hole_subtype is not None
+            )
+            logger.info(
+                f"[{model_id}] ✓ Hole classification: {hole_count} holes classified"
+            )
+        except Exception as e:
+            engine_status["hole_classification"] = f"FAILED: {e}"
+            logger.error(
+                f"[{model_id}] ✗ Hole classification FAILED: {e}",
+                exc_info=True,
+            )
+
+        # Step 6b: Feature Relationship Mapping
+        try:
+            from cad_worker.geometry_engine.feature_relationship_mapper import (
+                build_feature_relationships,
+            )
+            spatial_features = build_feature_relationships(
+                spatial_features, topology_graph
+            )
+            engine_status["feature_relationships"] = "OK"
+            parent_count = sum(
+                1 for f in spatial_features if f.parent_feature_id is not None
+            )
+            logger.info(
+                f"[{model_id}] ✓ Feature relationships: "
+                f"{parent_count} parent-child links"
+            )
+        except Exception as e:
+            engine_status["feature_relationships"] = f"FAILED: {e}"
+            logger.error(
+                f"[{model_id}] ✗ Feature relationship mapping FAILED: {e}",
+                exc_info=True,
+            )
+
+        # Step 6c: Machining Class Assignment
+        try:
+            from cad_worker.geometry_engine.machining_class_assigner import (
+                assign_machining_classes,
+            )
+            spatial_features = assign_machining_classes(
+                spatial_features, datum_candidates, topology_graph
+            )
+            engine_status["machining_classification"] = "OK"
+            flip_count = sum(1 for f in spatial_features if f.requires_flip)
+            multi_count = sum(1 for f in spatial_features if f.requires_multi_axis)
+            logger.info(
+                f"[{model_id}] ✓ Machining classes: "
+                f"{flip_count} flips, {multi_count} multi-axis"
+            )
+        except Exception as e:
+            engine_status["machining_classification"] = f"FAILED: {e}"
+            logger.error(
+                f"[{model_id}] ✗ Machining class assignment FAILED: {e}",
+                exc_info=True,
+            )
+
+        # Step 7: Manufacturability Analysis (uses enhanced features + datum)
         try:
             from cad_worker.intelligence.manufacturability_analyzer import analyze
             manufacturability_analysis = analyze(
@@ -294,7 +364,9 @@ def generate_manufacturing_geometry_report(
     else:
         # Topology failed — mark all dependent engines as skipped
         for key in ["spatial_mapping", "stock_recommendation",
-                     "datum_detection", "manufacturability", "complexity_score"]:
+                     "datum_detection", "hole_classification",
+                     "feature_relationships", "machining_classification",
+                     "manufacturability", "complexity_score"]:
             engine_status[key] = "SKIPPED (topology_graph failed)"
         logger.warning(
             f"[{model_id}] Steps 4-8 skipped due to topology_graph failure"

@@ -145,6 +145,21 @@ _MIN_TOOL_RADIUS_MM = 2.0
 # Perpendicularity threshold: |n_A · n_B| < 0.15 means faces are ~perpendicular
 _PERPENDICULAR_THRESHOLD = 0.15
 
+# ── Phase B Enhancement: Deep Blind Hole ────────────────────────────────────
+# A BLIND hole with depth/diameter > 10 is extremely hard to machine.
+# Chip evacuation fails, drill wander increases, breakage risk is high.
+_DEEP_BLIND_HOLE_THRESHOLD = 10.0
+
+# ── Phase B Enhancement: Small Chamfer ──────────────────────────────────────
+# Chamfers narrower than 0.5mm need micro-tooling, which is expensive
+# and fragile. Most shops reject sub-0.5mm chamfers.
+_SMALL_CHAMFER_THRESHOLD_MM = 0.5
+
+# ── Phase B Enhancement: Thin Wall Near Pocket ──────────────────────────────
+# If a thin wall is adjacent to a pocket floor, vibration during
+# roughing can cause chatter marks and dimensional loss.
+_THIN_WALL_NEAR_POCKET_MM = 1.5
+
 
 def _normalize_vector(
     v: tuple[float, float, float],
@@ -234,6 +249,27 @@ def analyze(
         warnings.extend(corner_warnings)
     except Exception as e:
         logger.warning(f"Sharp corner check failed: {e}", exc_info=True)
+
+    # ── Check 6: Deep Blind Holes (Phase B Enhancement) ─────────────────
+    try:
+        deep_blind_warnings = _check_deep_blind_holes(features)
+        warnings.extend(deep_blind_warnings)
+    except Exception as e:
+        logger.warning(f"Deep blind hole check failed: {e}", exc_info=True)
+
+    # ── Check 7: Small Chamfers (Phase B Enhancement) ───────────────────
+    try:
+        chamfer_warnings = _check_small_chamfers(features)
+        warnings.extend(chamfer_warnings)
+    except Exception as e:
+        logger.warning(f"Small chamfer check failed: {e}", exc_info=True)
+
+    # ── Check 8: Intersecting Features (Phase B Enhancement) ────────────
+    try:
+        intersect_warnings = _check_intersecting_features(features)
+        warnings.extend(intersect_warnings)
+    except Exception as e:
+        logger.warning(f"Intersecting features check failed: {e}", exc_info=True)
 
     elapsed_ms = (time.monotonic() - t_start) * 1000
     high_count = sum(1 for w in warnings if w.severity == "HIGH")
@@ -563,6 +599,132 @@ def _check_sharp_corners(
                     f"min_fillet_arc={min_fillet_arc:.4f}mm "
                     f"(for ∅{_MIN_TOOL_RADIUS_MM * 2}mm tool). "
                     f"Face angle dot={dot:.4f}."
+                ),
+            ))
+
+    return warnings
+
+
+# ── Phase B Enhancement checks ──────────────────────────────────────────────
+
+def _check_deep_blind_holes(
+    features: list[FeatureSpatial],
+) -> list[ManufacturabilityWarning]:
+    """
+    Flag BLIND holes with extreme depth/diameter ratio.
+
+    A blind hole with depth/diameter > 10 is extremely difficult:
+      • Chip evacuation fails (chips pack at bottom)
+      • Drill wander increases proportionally to depth
+      • Breakage risk is HIGH
+      • Surface finish degrades
+
+    Only applies to holes with hole_subtype=BLIND (not THROUGH, not COUNTERBORE).
+    """
+    warnings: list[ManufacturabilityWarning] = []
+
+    for feat in features:
+        if feat.type != "HOLE":
+            continue
+        if feat.hole_subtype != "BLIND":
+            continue
+
+        depth = feat.depth or 0.0
+        diameter = feat.diameter or 0.0
+
+        if diameter < _TOLERANCE:
+            continue
+
+        ratio = depth / diameter
+        if ratio > _DEEP_BLIND_HOLE_THRESHOLD:
+            warnings.append(ManufacturabilityWarning(
+                type="DEEP_BLIND_HOLE",
+                feature_id=feat.id,
+                severity="HIGH",
+                reason=(
+                    f"Blind hole {feat.id}: depth/diameter={ratio:.1f} "
+                    f"(∅{diameter}mm × {depth}mm deep). "
+                    f"Exceeds {_DEEP_BLIND_HOLE_THRESHOLD}:1 — "
+                    f"peck drilling with coolant-through required, "
+                    f"high breakage risk."
+                ),
+            ))
+
+    return warnings
+
+
+def _check_small_chamfers(
+    features: list[FeatureSpatial],
+) -> list[ManufacturabilityWarning]:
+    """
+    Flag chamfers that are too narrow for standard tooling.
+
+    Chamfers < 0.5mm width require micro-chamfer tools which:
+      • Are expensive (10x standard chamfer mills)
+      • Break easily (carbide micro-tools are fragile)
+      • Require high-speed spindles (20,000+ RPM)
+    """
+    warnings: list[ManufacturabilityWarning] = []
+
+    for feat in features:
+        if feat.type != "CHAMFER":
+            continue
+
+        width = feat.width or 0.0
+        if width < _TOLERANCE:
+            continue
+
+        if width < _SMALL_CHAMFER_THRESHOLD_MM:
+            warnings.append(ManufacturabilityWarning(
+                type="SMALL_CHAMFER",
+                feature_id=feat.id,
+                severity="MEDIUM",
+                reason=(
+                    f"Chamfer {feat.id}: width={width:.3f}mm "
+                    f"< {_SMALL_CHAMFER_THRESHOLD_MM}mm threshold. "
+                    f"Requires micro-chamfer tooling (expensive, fragile)."
+                ),
+            ))
+
+    return warnings
+
+
+def _check_intersecting_features(
+    features: list[FeatureSpatial],
+) -> list[ManufacturabilityWarning]:
+    """
+    Flag features with overlapping bounding volumes.
+
+    Intersecting features increase machining complexity because:
+      • Toolpaths must account for material already removed
+      • Interrupted cuts cause tool chatter
+      • Dimensional accuracy decreases at intersections
+
+    Uses the intersecting_feature_ids populated by the relationship mapper.
+    """
+    warnings: list[ManufacturabilityWarning] = []
+    # Track pairs to avoid duplicate warnings
+    warned_pairs: set[tuple[str, str]] = set()
+
+    for feat in features:
+        if not feat.intersecting_feature_ids:
+            continue
+
+        for other_id in feat.intersecting_feature_ids:
+            pair = tuple(sorted([feat.id, other_id]))
+            if pair in warned_pairs:
+                continue
+            warned_pairs.add(pair)
+
+            warnings.append(ManufacturabilityWarning(
+                type="INTERSECTING_FEATURES",
+                feature_id=feat.id,
+                severity="MEDIUM",
+                reason=(
+                    f"Features {feat.id} ({feat.type}) and {other_id} "
+                    f"have overlapping bounding volumes. "
+                    f"Toolpath ordering must account for material removal "
+                    f"sequence to avoid interrupted cuts."
                 ),
             ))
 

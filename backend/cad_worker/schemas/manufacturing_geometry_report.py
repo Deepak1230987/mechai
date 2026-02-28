@@ -145,23 +145,44 @@ class TopologyGraph(BaseModel):
 
 class FeatureSpatial(BaseModel):
     """
-    A detected machining feature with full spatial metadata.
+    A detected machining feature with full spatial + semantic metadata.
 
+    PHASE B PLANNING CONTRACT
+    =========================
+    This schema is the input to the AI Process Planning Brain.
+    Every field maps to a specific planning decision:
+
+      • type + hole_subtype → tool selection (drill vs tap vs counterbore)
+      • machining_class → operation grouping (ROUGH before FINISH)
+      • parent_feature_id / child_feature_ids → sequencing (parent first)
+      • intersecting_feature_ids → collision detection
+      • requires_flip → setup count estimation
+      • requires_multi_axis → machine capability routing (3-axis vs 5-axis)
+      • tolerance / surface_finish → pass strategy (rough → semi → finish)
+
+    SPATIAL ANCHORING
+    =================
     Every feature is anchored to the topology graph via `parent_face_id`.
     The `accessibility_direction` is the tool approach vector — opposite
-    of the parent face normal — which determines whether the feature
-    is reachable from a given setup orientation.
+    of the parent face normal — determining reachability per setup.
 
-    `is_through` indicates whether the feature penetrates the full
-    stock depth (e.g., through-hole vs. blind hole). This affects
-    tool selection (through-drill vs. end mill) and fixturing.
+    `is_through` indicates full stock penetration (through-hole vs blind).
     """
+
+    # ── Identity ────────────────────────────────────────────────────────
     id: str = Field(..., description="Unique feature identifier (e.g., 'FEAT_001')")
-    type: str = Field(..., description="Feature type: HOLE, POCKET, SLOT, TURN_PROFILE")
+    type: str = Field(
+        ...,
+        description="Feature type: HOLE, POCKET, SLOT, TURN_PROFILE, CHAMFER, FILLET",
+    )
+
+    # ── Geometric Dimensions ────────────────────────────────────────────
     diameter: Optional[float] = Field(None, ge=0.0, description="Diameter (holes, cylindrical features)")
     depth: Optional[float] = Field(None, ge=0.0, description="Feature depth along access direction")
-    width: Optional[float] = Field(None, ge=0.0, description="Feature width (slots, pockets)")
+    width: Optional[float] = Field(None, ge=0.0, description="Feature width (slots, pockets, chamfers)")
     length: Optional[float] = Field(None, ge=0.0, description="Feature length (slots)")
+
+    # ── Spatial Position ────────────────────────────────────────────────
     position: tuple[float, float, float] = Field(
         ..., description="Feature centroid in global coordinates"
     )
@@ -176,6 +197,86 @@ class FeatureSpatial(BaseModel):
     )
     is_through: bool = Field(
         False, description="True if feature penetrates entire stock depth"
+    )
+
+    # ── Quality Specifications (Phase B: pass strategy) ─────────────────
+    tolerance: Optional[float] = Field(
+        None, ge=0.0,
+        description=(
+            "Dimensional tolerance in model units. "
+            "Drives pass strategy: tight (< 0.05mm) → rough + semi + finish; "
+            "loose (> 0.1mm) → rough only."
+        ),
+    )
+    surface_finish: Optional[float] = Field(
+        None, ge=0.0,
+        description=(
+            "Required surface roughness Ra in μm. "
+            "< 0.8 Ra → grinding/polishing; 0.8–3.2 Ra → finish pass; "
+            "> 3.2 Ra → rough pass acceptable."
+        ),
+    )
+
+    # ── Hole Semantics (Phase B: tool selection) ────────────────────────
+    hole_subtype: Optional[
+        Literal["THROUGH", "BLIND", "COUNTERBORE", "COUNTERSINK", "THREADED"]
+    ] = Field(
+        None,
+        description=(
+            "Hole classification that determines tool sequence: "
+            "THROUGH → twist drill; BLIND → peck drill; "
+            "COUNTERBORE → drill + counterbore tool; "
+            "COUNTERSINK → drill + countersink; THREADED → drill + tap."
+        ),
+    )
+
+    # ── Machining Classification (Phase B: operation grouping) ──────────
+    machining_class: Literal[
+        "ROUGH", "FINISH", "DRILL", "THREAD", "CHAMFER", "PROFILE"
+    ] = Field(
+        "ROUGH",
+        description=(
+            "Operation class for grouping: "
+            "ROUGH → bulk removal; FINISH → surface quality; "
+            "DRILL → hole-making; THREAD → tapping; "
+            "CHAMFER → edge breaking; PROFILE → contour following."
+        ),
+    )
+
+    # ── Feature Hierarchy (Phase B: operation sequencing) ───────────────
+    parent_feature_id: Optional[str] = Field(
+        None,
+        description=(
+            "ID of the parent feature (e.g., hole inside pocket → pocket is parent). "
+            "Parent must be machined before this feature."
+        ),
+    )
+    child_feature_ids: list[str] = Field(
+        default_factory=list,
+        description="IDs of features that depend on this one (machined after).",
+    )
+    intersecting_feature_ids: list[str] = Field(
+        default_factory=list,
+        description=(
+            "IDs of features whose bounding volumes overlap. "
+            "Requires collision-aware toolpath ordering."
+        ),
+    )
+
+    # ── Setup Planning Flags (Phase B: setup planner) ───────────────────
+    requires_flip: bool = Field(
+        False,
+        description=(
+            "True if feature accessibility is opposite to primary datum. "
+            "Each flip adds a separate setup (clamp, probe, reference)."
+        ),
+    )
+    requires_multi_axis: bool = Field(
+        False,
+        description=(
+            "True if feature axis is not aligned with any principal axis. "
+            "Requires 4-axis or 5-axis machine, or custom fixture."
+        ),
     )
 
 
