@@ -54,12 +54,21 @@ class DeterministicFeatureValidator(FeatureValidator):
         bbox = geometry_metadata.get("bounding_box", {})
         volume = geometry_metadata.get("volume", 0.0)
 
-        # Compute max model dimension for relative checks
-        model_dims = [
-            abs(bbox.get("x_max", 100) - bbox.get("x_min", 0)),
-            abs(bbox.get("y_max", 100) - bbox.get("y_min", 0)),
-            abs(bbox.get("z_max", 100) - bbox.get("z_min", 0)),
-        ]
+        # Compute max model dimension — handle both bbox formats:
+        #   Format A: {"x_min": ..., "x_max": ..., "y_min": ..., "y_max": ..., "z_min": ..., "z_max": ...}
+        #   Format B: {"length": ..., "width": ..., "height": ...}
+        if "length" in bbox or "width" in bbox or "height" in bbox:
+            model_dims = [
+                abs(bbox.get("length", 0.0)),
+                abs(bbox.get("width", 0.0)),
+                abs(bbox.get("height", 0.0)),
+            ]
+        else:
+            model_dims = [
+                abs(bbox.get("x_max", 100) - bbox.get("x_min", 0)),
+                abs(bbox.get("y_max", 100) - bbox.get("y_min", 0)),
+                abs(bbox.get("z_max", 100) - bbox.get("z_min", 0)),
+            ]
         max_model_dim = max(model_dims) if model_dims else 100.0
 
         validated: list[dict] = []

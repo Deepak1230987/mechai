@@ -66,6 +66,7 @@ const MATERIALS = [
 const MACHINE_TYPES: { value: MachineType; label: string }[] = [
   { value: "MILLING_3AXIS", label: "3-Axis Milling" },
   { value: "LATHE", label: "CNC Lathe" },
+  
 ];
 
 // ─── Page ────────────────────────────────────────────────────────────────────

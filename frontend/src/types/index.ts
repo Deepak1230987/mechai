@@ -79,8 +79,11 @@ export interface Model {
     visibility: ModelVisibility;
     geometry?: Geometry;
     features?: Feature[];
+    intelligence_ready?: boolean;
     gltf_url?: string;
+    thumbnail_url?: string | null;
     created_at: string;
+    updated_at?: string;
 }
 
 // ─── API Request / Response Types ────────────────────────────────────────────

@@ -25,6 +25,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from shared.config import get_settings
 from ai_service.routes.planning import planning_router
+from ai_service.routes.intelligence import intelligence_router
 
 logging.basicConfig(
     level=logging.INFO,
@@ -51,6 +52,7 @@ app.add_middleware(
 
 # ── Routes ────────────────────────────────────────────────────────────────────
 app.include_router(planning_router)
+app.include_router(intelligence_router)
 
 
 @app.get("/health")

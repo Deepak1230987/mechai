@@ -139,3 +139,26 @@ async def planning_root_proxy(
             "X-User-Role": user.role,
         },
     )
+
+
+# ─── Intelligence routes (Phase C — protected) ──────────────────────────────
+
+@gateway_router.api_route(
+    "/intelligence/{path:path}",
+    methods=["GET", "POST", "PUT", "DELETE", "PATCH"],
+)
+async def intelligence_proxy(
+    request: Request,
+    path: str,
+    user: CurrentUser = Depends(require_auth),
+):
+    """Proxy all /intelligence/* requests to the AI Service (Phase C)."""
+    return await proxy_request(
+        request=request,
+        target_base_url=settings.AI_SERVICE_URL,
+        target_path=f"/intelligence/{path}",
+        extra_headers={
+            "X-User-ID": user.user_id,
+            "X-User-Role": user.role,
+        },
+    )

@@ -12,7 +12,7 @@ import { DashboardPage } from "@/pages/dashboard/DashboardPage";
 import { ModelsPage } from "@/pages/dashboard/ModelsPage";
 import { ModelUploadPage } from "@/pages/dashboard/ModelUploadPage";
 import { ModelDetailPage } from "@/pages/dashboard/ModelDetailPage";
-import { MachiningPlanPage } from "@/pages/dashboard/MachiningPlanPage";
+import { ModelWorkspacePage } from "@/pages/ModelWorkspace";
 
 // Vendor pages
 import { VendorDashboardPage } from "@/pages/vendor/VendorDashboardPage";
@@ -78,11 +78,7 @@ export const router = createBrowserRouter([
       },
       {
         path: "/models/:modelId/plan",
-        element: (
-          <RoleGuard allowedRoles={["USER"]}>
-            <MachiningPlanPage />
-          </RoleGuard>
-        ),
+        element: <Navigate to="../workspace" replace />,
       },
 
       // ── VENDOR routes ────────────────────────────────────────────────────
@@ -137,6 +133,18 @@ export const router = createBrowserRouter([
         ),
       },
     ],
+  },
+
+  // ─── Full-screen workspace (outside AppLayout) ─────────────────────────────
+  {
+    path: "/models/:modelId/workspace",
+    element: (
+      <ProtectedRoute>
+        <RoleGuard allowedRoles={["USER"]}>
+          <ModelWorkspacePage />
+        </RoleGuard>
+      </ProtectedRoute>
+    ),
   },
 
   // ─── Catch-all redirect ────────────────────────────────────────────────────

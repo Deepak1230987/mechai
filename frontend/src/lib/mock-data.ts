@@ -68,7 +68,10 @@ export function decodeMockToken(token: string): User | null {
 export const MOCK_MODELS: Model[] = [
     {
         id: "m1",
+        user_id: "u1",
         name: "Bracket Assembly v2",
+        original_filename: "bracket_v2.step",
+        file_format: "STEP",
         version: 2,
         status: "FAILED",
         visibility: "PRIVATE",
@@ -78,7 +81,10 @@ export const MOCK_MODELS: Model[] = [
     },
     {
         id: "m2",
+        user_id: "u1",
         name: "Motor Mount",
+        original_filename: "motor_mount.step",
+        file_format: "STEP",
         version: 1,
         status: "PROCESSING",
         visibility: "PRIVATE",
@@ -88,17 +94,23 @@ export const MOCK_MODELS: Model[] = [
     },
     {
         id: "m3",
+        user_id: "u1",
         name: "Sensor Housing",
+        original_filename: "sensor_housing.step",
+        file_format: "STEP",
         version: 3,
         status: "UPLOADED",
         visibility: "PUBLIC",
-        created_at: new Date(Date.now() - 259200000).toISOString(), // Example date for m3
+        created_at: new Date(Date.now() - 259200000).toISOString(),
         updated_at: new Date(Date.now() - 200000000).toISOString(),
         thumbnail_url: null,
     },
     {
         id: "m4",
+        user_id: "u1",
         name: "Robotic Arm Link",
+        original_filename: "arm_link.step",
+        file_format: "STEP",
         version: 1,
         status: "READY",
         visibility: "PUBLIC",
@@ -108,11 +120,14 @@ export const MOCK_MODELS: Model[] = [
     },
     {
         id: "m5",
+        user_id: "u1",
         name: "Heat Sink Custom",
+        original_filename: "heatsink.step",
+        file_format: "STEP",
         version: 2,
         status: "PROCESSING",
         visibility: "PRIVATE",
-        created_at: new Date(Date.now() - 129600000).toISOString(), // Example date for m5
+        created_at: new Date(Date.now() - 129600000).toISOString(),
         updated_at: new Date(Date.now() - 100000000).toISOString(),
         thumbnail_url: null,
     },

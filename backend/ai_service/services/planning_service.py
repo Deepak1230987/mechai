@@ -138,10 +138,55 @@ async def generate_plan(
     )
 
     if not context.features:
-        raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-            detail="No features in intelligence report — cannot generate plan",
+        # ── Synthesise minimal features from geometry so we can still plan ────
+        bb = context.geometry.bounding_box or {}
+        synth: list = []
+
+        length = bb.get("length", 0.0)
+        width  = bb.get("width",  0.0)
+        height = bb.get("height", 0.0)
+
+        from ai_service.schemas.planning_context import FeatureContext as FC
+
+        # A facing / profiling feature for any model with a bounding box
+        if length > 0 and width > 0 and height > 0:
+            synth.append(FC(
+                id="SYNTH_FACE_001",
+                type="FACE",
+                confidence=0.8,
+                dimensions={"length": length, "width": width, "depth": height},
+                depth=height,
+                axis={"x": 0.0, "y": 0.0, "z": 1.0},
+                accessibility_direction="TOP",
+                machining_class="FACING",
+                requires_flip=False,
+                requires_multi_axis=False,
+            ))
+            # Add a contour / profiling feature
+            synth.append(FC(
+                id="SYNTH_PROFILE_001",
+                type="CONTOUR",
+                confidence=0.7,
+                dimensions={"length": 2 * (length + width), "depth": height},
+                depth=height,
+                axis={"x": 0.0, "y": 0.0, "z": 1.0},
+                accessibility_direction="TOP",
+                machining_class="PROFILING",
+                requires_flip=False,
+                requires_multi_axis=False,
+            ))
+
+        if not synth:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail="No features in intelligence report and geometry is insufficient — cannot generate plan",
+            )
+
+        logger.info(
+            "No features detected — synthesised %d features from geometry (model=%s)",
+            len(synth), req.model_id,
         )
+        context.features = synth
 
     # ── 5. Feature Validation Layer (ML boundary) ────────────────────────────
     raw_feature_dicts = [f.model_dump() for f in context.features]

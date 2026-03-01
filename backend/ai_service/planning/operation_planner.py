@@ -115,6 +115,10 @@ def _dispatch_feature(
         return _plan_slot(feat, context, seq)
     if ftype == "TURN_PROFILE":
         return _plan_turn_profile(feat, context, seq)
+    if ftype == "FACE":
+        return _plan_face(feat, context, seq)
+    if ftype == "CONTOUR":
+        return _plan_contour(feat, context, seq)
     logger.warning("No operation planner for feature type '%s'", ftype)
     return []
 
@@ -253,5 +257,66 @@ def _plan_turn_profile(
         parameters={"doc_mm": 0.3, "bounding_box": bbox},
         sequence_key=seq.get("FINISH_TURNING", 20),
         depth_priority=feat.depth or 0,
+    )
+    return [roughing, finishing]
+
+
+def _plan_face(
+    feat: FeatureContext,
+    context: PlanningContext,
+    seq: dict[str, int],
+) -> list[PlannedOperation]:
+    """FACE → Face milling pass (roughing + finishing)."""
+    dims = feat.dimensions
+    length = dims.get("length", 100.0)
+    width = dims.get("width", 50.0)
+    depth = feat.depth or dims.get("depth", 1.0)
+
+    roughing = PlannedOperation(
+        feature_id=feat.id,
+        op_type="FACE_MILLING",
+        tool_hint="FACE_MILL",
+        parameters={
+            "length": length, "width": width,
+            "depth": depth, "doc_pct": 0.60,
+            "stepover_pct": 0.75,
+        },
+        sequence_key=seq.get("FACE_MILLING", 5),
+        depth_priority=depth,
+    )
+    return [roughing]
+
+
+def _plan_contour(
+    feat: FeatureContext,
+    context: PlanningContext,
+    seq: dict[str, int],
+) -> list[PlannedOperation]:
+    """CONTOUR → Rough contour + Finish contour pass."""
+    dims = feat.dimensions
+    perimeter = dims.get("length", 100.0)
+    depth = feat.depth or dims.get("depth", 5.0)
+
+    roughing = PlannedOperation(
+        feature_id=feat.id,
+        op_type="POCKET_ROUGHING",
+        tool_hint="FLAT_END_MILL",
+        parameters={
+            "perimeter": perimeter, "depth": depth,
+            "stepover_pct": 0.50, "doc_pct": 0.80,
+        },
+        sequence_key=seq.get("POCKET_ROUGHING", 20),
+        depth_priority=depth,
+    )
+    finishing = PlannedOperation(
+        feature_id=feat.id,
+        op_type="FINISH_CONTOUR",
+        tool_hint="FLAT_END_MILL",
+        parameters={
+            "perimeter": perimeter, "depth": depth,
+            "stepover_pct": 0.10, "doc_pct": 1.0,
+        },
+        sequence_key=seq.get("FINISH_CONTOUR", 60),
+        depth_priority=depth,
     )
     return [roughing, finishing]

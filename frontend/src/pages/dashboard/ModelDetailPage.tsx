@@ -295,7 +295,7 @@ export function ModelDetailPage() {
                     {isSTL ? (
                       <Button className="w-full" disabled>
                         <Cog className="mr-2 h-4 w-4" />
-                        Machining Plan
+                        Open Workspace
                       </Button>
                     ) : (
                       <Button
@@ -303,9 +303,9 @@ export function ModelDetailPage() {
                         asChild
                         disabled={model.status !== "READY"}
                       >
-                        <Link to={`/models/${model.id}/plan`}>
+                        <Link to={`/models/${model.id}/workspace`}>
                           <Cog className="mr-2 h-4 w-4" />
-                          Machining Plan
+                          Open Workspace
                         </Link>
                       </Button>
                     )}
@@ -314,7 +314,7 @@ export function ModelDetailPage() {
                 {isSTL && (
                   <TooltipContent>
                     <p>
-                      Machining plan requires B-Rep format (STEP/IGES).
+                      Workspace requires B-Rep format (STEP/IGES).
                       <br />
                       STL does not support feature recognition.
                     </p>

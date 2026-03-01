@@ -50,7 +50,7 @@ export function AdminModelsPage() {
                     </Badge>
                   </TableCell>
                   <TableCell className="text-muted-foreground">
-                    {new Date(model.createdAt).toLocaleDateString()}
+                    {new Date(model.created_at).toLocaleDateString()}
                   </TableCell>
                 </TableRow>
               ))}
