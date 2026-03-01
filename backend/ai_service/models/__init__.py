@@ -81,6 +81,24 @@ class MachiningPlan(Base):
         default=None,
         comment="Timestamp of approval (nullable until approved)",
     )
+    previous_version_id: Mapped[Optional[str]] = mapped_column(
+        String(36),
+        nullable=True,
+        default=None,
+        comment="ID of the plan this version was derived from (NULL for v1)",
+    )
+    modification_reason: Mapped[Optional[str]] = mapped_column(
+        Text,
+        nullable=True,
+        default=None,
+        comment="Why this version was created (e.g. 'User confirmed tool change')",
+    )
+    approval_status: Mapped[str] = mapped_column(
+        String(20),
+        nullable=False,
+        default="DRAFT",
+        comment="DRAFT | PENDING_REVIEW | APPROVED | REJECTED",
+    )
     process_summary: Mapped[Optional[str]] = mapped_column(
         Text,
         nullable=True,

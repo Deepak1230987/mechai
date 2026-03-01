@@ -21,7 +21,7 @@ from sqlalchemy import select, func
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ai_service.models import MachiningPlan, PlanFeedback
-from ai_service.services.plan_validator import PlanValidator, PlanValidationError
+from ai_service.planning.plan_validator import PlanValidationError
 
 logger = logging.getLogger(__name__)
 
@@ -226,21 +226,39 @@ async def approve_plan(
         )
 
     # ── Re-validate plan data ────────────────────────────────────────────
-    # Extract feature IDs from operations (we don't require the full
-    # feature objects — the plan must be self-consistent).
+    # Build a MachiningPlanResponse + minimal PlanningContext for validation.
+    from ai_service.schemas.machining_plan import MachiningPlanResponse
+    from ai_service.schemas.planning_context import PlanningContext, FeatureContext
+    from ai_service.planning.plan_validator import validate_final_plan
+
     plan_data = plan.plan_data
+    plan_response = MachiningPlanResponse(**plan_data)
+
+    # Build minimal PlanningContext from the operations' feature_ids
     feature_stubs = [
-        {"id": op["feature_id"]}
+        FeatureContext(id=op["feature_id"], type="UNKNOWN", confidence=1.0)
         for op in plan_data.get("operations", [])
     ]
+    # Deduplicate by feature id
+    seen_ids: set[str] = set()
+    unique_features: list[FeatureContext] = []
+    for f in feature_stubs:
+        if f.id not in seen_ids:
+            seen_ids.add(f.id)
+            unique_features.append(f)
 
-    pv = PlanValidator(feature_stubs, plan.material, plan.machine_type)
-    try:
-        pv.validate(plan_data)
-    except PlanValidationError as exc:
+    context = PlanningContext(
+        model_id=plan.model_id,
+        material=plan.material,
+        machine_type=plan.machine_type,
+        features=unique_features,
+    )
+
+    vr = validate_final_plan(plan_response, context)
+    if not vr.valid:
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-            detail=f"Plan failed validation, cannot approve: {exc.errors}",
+            detail=f"Plan failed validation, cannot approve: {vr.errors}",
         )
 
     # ── Set approval fields ──────────────────────────────────────────────

@@ -16,6 +16,7 @@ from cad_service.schemas import (
     ModelResponse,
     ModelListResponse,
     ViewerUrlResponse,
+    IntelligenceResponse,
 )
 from cad_service.services import (
     request_upload,
@@ -23,6 +24,7 @@ from cad_service.services import (
     list_user_models,
     get_model,
     get_viewer_url,
+    get_model_intelligence,
 )
 
 models_router = APIRouter()
@@ -87,3 +89,27 @@ async def get_model_viewer_url(
 ):
     """Get a signed glTF URL for the 3D viewer (only if status == READY)."""
     return await get_viewer_url(model_id, user_id, db)
+
+
+@models_router.get(
+    "/{model_id}/intelligence",
+    response_model=IntelligenceResponse,
+    summary="Get manufacturing intelligence for a model",
+    description=(
+        "Returns the full ManufacturingGeometryReport stored as JSONB. "
+        "This is the single source of truth for AI planning. "
+        "Returns 404 if intelligence has not been generated yet."
+    ),
+)
+async def get_intelligence(
+    model_id: str,
+    db: AsyncSession = Depends(get_session),
+):
+    """
+    Fetch manufacturing intelligence for a model.
+
+    No user auth required — this is a service-to-service endpoint
+    consumed by the AI Service. In production, protect with service mesh
+    or internal auth.
+    """
+    return await get_model_intelligence(model_id, db)

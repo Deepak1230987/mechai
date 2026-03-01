@@ -30,6 +30,7 @@ from cad_service.schemas import (
     ViewerUrlResponse,
     GeometryResponse,
     FeatureResponse,
+    IntelligenceResponse,
 )
 
 logger = logging.getLogger(__name__)
@@ -245,8 +246,10 @@ async def get_model(
         geometry = geo_result.scalar_one_or_none()
         if geometry:
             response.geometry = GeometryResponse.model_validate(geometry)
+            # Derive intelligence_ready from ModelGeometry
+            response.intelligence_ready = bool(geometry.intelligence_ready)
 
-        # Attach detected features
+        # Attach detected features (DEPRECATED — intelligence report is source of truth)
         feat_result = await db.execute(
             select(ModelFeature).where(ModelFeature.model_id == model_id)
         )
@@ -294,4 +297,63 @@ async def get_viewer_url(
     return ViewerUrlResponse(
         model_id=model.id,
         gltf_url=gltf_url,
+    )
+
+
+async def get_model_intelligence(
+    model_id: str,
+    db: AsyncSession,
+) -> IntelligenceResponse:
+    """
+    Fetch manufacturing intelligence for a model.
+
+    Returns IntelligenceResponse containing the full ManufacturingGeometryReport.
+    This is the API contract between CAD Service and AI Service.
+
+    Raises:
+        HTTPException 404 if model not found or intelligence not generated.
+    """
+    from cad_worker.models import ModelGeometry
+
+    # Verify model exists
+    model_result = await db.execute(
+        select(CADModel).where(CADModel.id == model_id)
+    )
+    model = model_result.scalar_one_or_none()
+    if not model:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Model {model_id} not found",
+        )
+
+    # Fetch intelligence from ModelGeometry
+    geom_result = await db.execute(
+        select(ModelGeometry).where(ModelGeometry.model_id == model_id)
+    )
+    geometry = geom_result.scalar_one_or_none()
+
+    if not geometry or not geometry.intelligence_ready:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Manufacturing intelligence not generated yet",
+        )
+
+    report = geometry.manufacturing_intelligence_report
+    if not report:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Manufacturing intelligence not generated yet",
+        )
+
+    logger.info(
+        "Intelligence fetched for model %s: complexity=%s, features=%d",
+        model_id,
+        report.get("complexity_score", {}).get("value", "N/A"),
+        len(report.get("features", [])),
+    )
+
+    return IntelligenceResponse(
+        model_id=model_id,
+        intelligence_ready=True,
+        manufacturing_geometry_report=report,
     )

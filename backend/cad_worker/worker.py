@@ -104,6 +104,10 @@ async def process_message(model_id: str, storage_path: str) -> None:
         logger.info(f"[{model_id}] Geometry record saved: {geometry_id}")
 
         # ── 6b. Feature recognition (BRep only) ─────────────────────────
+        # DEPRECATED: Legacy feature rows in model_features table.
+        # Kept for backward compatibility; intelligence report is now
+        # the single source of truth. Do NOT add new consumers of
+        # model_features — use manufacturing_intelligence_report JSONB.
         if geometry_result.geometry_type == "BREP":
             logger.info(f"[{model_id}] Running feature recognition (BRep)...")
             # Load shape once for feature detection (reuse engine)
@@ -114,7 +118,8 @@ async def process_message(model_id: str, storage_path: str) -> None:
             if feature_results:
                 feature_ids = await save_features(model_id, feature_results)
                 logger.info(
-                    f"[{model_id}] {len(feature_ids)} features saved"
+                    f"[{model_id}] {len(feature_ids)} legacy features saved "
+                    f"(DEPRECATED — intelligence report is source of truth)"
                 )
             else:
                 logger.info(f"[{model_id}] No features detected")
@@ -125,10 +130,13 @@ async def process_message(model_id: str, storage_path: str) -> None:
             )
 
         # ── 6c. Manufacturing Intelligence (BRep only) ──────────────────
+        # This is the SINGLE SOURCE OF TRUTH for downstream AI planning.
+        # For BRep models, intelligence MUST succeed before marking READY.
+        intelligence_stored = False
         if geometry_result.geometry_type == "BREP":
             try:
                 logger.info(
-                    f"[{model_id}] Running manufacturing intelligence pipeline..."
+                    f"[{model_id}] Generating ManufacturingGeometryReport..."
                 )
                 # brep_shape was loaded in step 6b — reuse it
                 intelligence_report, engine_status = await asyncio.to_thread(
@@ -136,22 +144,42 @@ async def process_message(model_id: str, storage_path: str) -> None:
                     brep_shape,
                     model_id,
                 )
-                # Serialize to dict for JSONB storage
-                report_dict = intelligence_report.model_dump(mode='json')
+                # Pydantic-validated serialization for JSONB storage
+                validated_report = intelligence_report.model_dump(mode='json')
                 await save_intelligence_report(
-                    model_id, report_dict, engine_status=engine_status
+                    model_id, validated_report, engine_status=engine_status
+                )
+                intelligence_stored = True
+
+                # ── Structured logging ────────────────────────────────────
+                logger.info(
+                    f"[{model_id}] Feature count: "
+                    f"{len(intelligence_report.features)}"
                 )
                 logger.info(
-                    f"[{model_id}] Manufacturing intelligence complete: "
-                    f"complexity={intelligence_report.complexity_score.value} "
+                    f"[{model_id}] Complexity score: "
+                    f"{intelligence_report.complexity_score.value} "
                     f"({intelligence_report.complexity_score.level})"
                 )
+                logger.info(
+                    f"[{model_id}] Intelligence report saved successfully"
+                )
+                # Verification output
+                print(f"INTELLIGENCE REPORT STORED: {model_id}")
+
             except Exception as intel_err:
                 logger.error(
-                    f"[{model_id}] Manufacturing intelligence FAILED "
-                    f"(non-blocking): {intel_err}",
+                    f"[{model_id}] Manufacturing intelligence FAILED: "
+                    f"{intel_err}",
                     exc_info=True,
                 )
+
+        # ── 6d. Require intelligence for BRep before READY ──────────────
+        if geometry_result.geometry_type == "BREP" and not intelligence_stored:
+            raise RuntimeError(
+                "Manufacturing intelligence is required for BRep models "
+                "but failed to generate or store. Model cannot be marked READY."
+            )
 
         # ── 7. Generate glTF ─────────────────────────────────────────────
         glb_data = await _generate_gltf(model_id, local_path, ext)

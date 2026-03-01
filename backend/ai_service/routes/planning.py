@@ -39,8 +39,10 @@ from ai_service.services.feedback_service import (
     approve_plan,
     get_latest_plan,
 )
-from ai_service.services.chat_refinement_service import chat_refine_plan
-from ai_service.services.narrative_service import generate_process_narrative
+from ai_service.chat.intent_router import IntentRouter, IntentType
+from ai_service.chat.refinement_engine import generate_refinement_diff
+from ai_service.chat.consent_manager import ConsentManager
+from ai_service.reasoning.narrative_generator import generate_narrative
 from ai_service.services.document_service import generate_plan_pdf
 
 logger = logging.getLogger(__name__)
@@ -192,46 +194,113 @@ async def chat(
     req: ChatRequest,
     session: AsyncSession = Depends(get_session),
 ) -> ChatResponse:
+    from ai_service.models import MachiningPlan as MachiningPlanModel
+    from ai_service.schemas.planning_context import PlanningContext, FeatureContext
+    from ai_service.versioning.plan_version_service import PlanVersionService
+
     logger.info(
         "Chat refinement: plan_id=%s msg=%r",
         plan_id,
         req.user_message[:80],
     )
 
-    result = await chat_refine_plan(
-        plan_id=plan_id,
-        user_message=req.user_message,
-        session=session,
-    )
+    # ── 1. Classify intent ───────────────────────────────────────────────
+    router = IntentRouter()
+    intent = router.classify_intent(req.user_message)
 
-    if result["type"] == "conversation":
+    # ── Handle confirm / reject ──────────────────────────────────────────
+    if intent == IntentType.CONFIRM_CHANGE:
+        confirmed_plan = ConsentManager.confirm(plan_id)
+        if confirmed_plan is None:
+            return ChatResponse(
+                type="conversation",
+                message="No pending proposal to confirm.",
+            )
+        version_svc = PlanVersionService(session)
+        row = await version_svc.save_new_version(
+            previous_plan_id=plan_id,
+            plan=confirmed_plan,
+            modification_reason="User confirmed chat proposal",
+        )
+        confirmed_plan.plan_id = row.id
+        return ChatResponse(
+            type="plan_update",
+            explanation="Changes confirmed and saved as new version.",
+            machining_plan=confirmed_plan,
+            version=row.version,
+        )
+
+    if intent == IntentType.REJECT_CHANGE:
+        ConsentManager.reject(plan_id)
         return ChatResponse(
             type="conversation",
-            message=result["message"],
+            message="Proposed changes discarded. The plan remains unchanged.",
         )
 
-    if result["type"] == "plan_proposal":
-        proposed_plan = result["proposed_plan"]
-        plan_response = MachiningPlanResponse(**proposed_plan.plan_data)
-        plan_response.plan_id = proposed_plan.id
-        
+    # ── Handle general conversation ──────────────────────────────────────
+    if intent == IntentType.GENERAL_CONVERSATION:
+        response_text = await router.conversational_response(req.user_message)
         return ChatResponse(
-            type="plan_proposal",
-            explanation=result["explanation"],
-            proposed_plan=plan_response,
-            version=result["new_version"],
+            type="conversation",
+            message=response_text,
         )
 
-    # It's a plan_update (although currently we only return plan_proposal)
-    new_plan = result["new_plan"]
-    plan_response = MachiningPlanResponse(**new_plan.plan_data)
-    plan_response.plan_id = new_plan.id
+    # ── Handle plan modification / request alternatives ──────────────────
+    plan_row = await session.get(MachiningPlanModel, plan_id)
+    if plan_row is None:
+        from fastapi import HTTPException, status as http_status
+        raise HTTPException(
+            status_code=http_status.HTTP_404_NOT_FOUND,
+            detail=f"Plan {plan_id} not found",
+        )
+
+    plan_response = MachiningPlanResponse(**plan_row.plan_data)
+    plan_response.plan_id = plan_row.id
+
+    # Build minimal PlanningContext from plan data
+    feature_stubs = []
+    seen: set[str] = set()
+    for op in plan_row.plan_data.get("operations", []):
+        fid = op.get("feature_id")
+        if fid and fid not in seen:
+            seen.add(fid)
+            feature_stubs.append(
+                FeatureContext(id=fid, type="UNKNOWN", confidence=1.0)
+            )
+    context = PlanningContext(
+        model_id=plan_row.model_id,
+        material=plan_row.material,
+        machine_type=plan_row.machine_type,
+        features=feature_stubs,
+    )
+
+    result = await generate_refinement_diff(
+        user_message=req.user_message,
+        plan=plan_response,
+        context=context,
+    )
+
+    if result["diff"].is_empty:
+        return ChatResponse(
+            type="conversation",
+            message="I couldn't identify specific changes from your request. "
+                    "Could you be more specific about what you'd like to modify?",
+        )
+
+    # Store as pending proposal — user must confirm
+    ConsentManager.store_proposal(
+        plan_id=plan_id,
+        diff=result["diff"],
+        preview_plan=result["preview_plan"],
+        context=context,
+        summary=result["summary"],
+    )
 
     return ChatResponse(
-        type="plan_update",
-        explanation=result["explanation"],
-        machining_plan=plan_response,
-        version=result["new_version"],
+        type="plan_proposal",
+        explanation=result["summary"],
+        proposed_plan=result["preview_plan"],
+        version=plan_row.version,
     )
 
 
@@ -264,31 +333,46 @@ async def narrative(
 
     logger.info("Narrative generation: plan_id=%s", plan_id)
 
-    # Try to fetch geometry metadata for richer narrative
-    geometry_metadata = None
+    # Fetch intelligence → PlanningContext for richer narratives
+    context = None
     try:
-        from sqlalchemy import select as sa_select
-        from cad_worker.models import ModelGeometry
-        geom_result = await session.execute(
-            sa_select(ModelGeometry).where(
-                ModelGeometry.model_id == plan.model_id
-            )
+        from ai_service.ingestion import fetch_model_intelligence, adapt_intelligence
+        intelligence = await fetch_model_intelligence(plan.model_id)
+        context = adapt_intelligence(
+            intelligence,
+            material=plan.material,
+            machine_type=plan.machine_type,
         )
-        geom = geom_result.scalars().first()
-        if geom:
-            geometry_metadata = {
-                "volume": geom.volume,
-                "surface_area": geom.surface_area,
-                "bounding_box": geom.bounding_box or {},
-            }
     except Exception:
-        logger.debug("Could not fetch geometry metadata — narrative will use plan data only")
+        logger.debug("Could not fetch intelligence — narrative will use plan data only")
 
-    text = await generate_process_narrative(
-        plan=plan,
-        geometry_metadata=geometry_metadata,
-        session=session,
-    )
+    plan_response = MachiningPlanResponse(**plan.plan_data)
+    plan_response.plan_id = plan.id
+
+    if context is not None:
+        text = await generate_narrative(plan_response, context)
+    else:
+        # Fallback: build minimal context from plan data
+        from ai_service.schemas.planning_context import PlanningContext, FeatureContext
+        feature_stubs = []
+        seen: set[str] = set()
+        for op in plan.plan_data.get("operations", []):
+            fid = op.get("feature_id")
+            if fid and fid not in seen:
+                seen.add(fid)
+                feature_stubs.append(
+                    FeatureContext(id=fid, type="UNKNOWN", confidence=1.0)
+                )
+        fallback_ctx = PlanningContext(
+            model_id=plan.model_id,
+            material=plan.material,
+            machine_type=plan.machine_type,
+            features=feature_stubs,
+        )
+        text = await generate_narrative(plan_response, fallback_ctx)
+
+    # Persist narrative to plan row
+    plan.process_summary = text
 
     return NarrativeResponse(
         plan_id=plan_id,

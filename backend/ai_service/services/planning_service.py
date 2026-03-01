@@ -1,58 +1,63 @@
 """
-Planning Service — hybrid pipeline orchestrator.
+Planning Service — Hybrid Deterministic + LLM Co-Planner Orchestrator.
 
-Pipeline:
-     1. Validate inputs  (machine_type, model exists, feature_ready)
-     2. Fetch geometry metadata + detected features from DB
-     3. Feature Validation Layer  →  FeatureValidator (DI boundary)
-     4. Validation Logging        →  ValidationLogger (non-blocking)
-     5. Rule Engine               →  operations + tools + setups + time
-     6. Build baseline plan dict
-     7. LangChain optimiser       →  optional LLM pass (graceful fallback)
-     8. Plan Validator            →  structural + physical checks
-     9. Compute version           →  next version for this model_id
-    10. Persist plan              →  approved=False (human approval required)
-    11. Return MachiningPlanResponse
+New pipeline (Phase B):
+     1. Validate inputs  (machine_type, model exists, READY status)
+     2. Fetch ManufacturingGeometryReport via CAD Service HTTP API
+     3. Adapt intelligence report → PlanningContext (typed Pydantic)
+     4. Feature Validation Layer   →  FeatureValidator (DI boundary)
+     5. Validation Logging         →  ValidationLogger (non-blocking)
+     6. Deterministic Base Plan    →  base_plan_generator pipeline
+     7. LLM Co-Planner            →  structured LLMDiff (not a full plan)
+     8. Diff Validator             →  referential integrity + safety
+     9. Plan Merger                →  apply validated diff to base plan
+    10. Final Plan Validator       →  structural + physical checks
+    11. Risk Integration           →  map flags to operations
+    12. Strategy Generation        →  CONSERVATIVE / OPTIMIZED / AGGRESSIVE
+    13. Narrative Generation       →  LLM process narrative (async)
+    14. Persist versioned plan     →  PlanVersionService
+    15. Return MachiningPlanResponse
 
-Separation rules enforced:
-    • No ML logic in this file.
-    • No LLM logic in this file.
-    • Feature validator = injected via abstract interface.
-    • LangChain pipeline = separate module, called as black-box.
-    • Plan validator     = separate module, called as black-box.
+Data source:
+    ManufacturingGeometryReport (single source of truth) fetched from
+    CAD Service GET /models/{model_id}/intelligence.
+
+Architecture:
+    LLM actively improves planning — but NEVER bypasses deterministic safety.
+    LLM output is always a structured diff, not a full plan replacement.
+    Deterministic validator gates every diff before merger applies it.
 """
 
 from __future__ import annotations
 
 import logging
-import uuid
-from datetime import datetime, timezone
 
 from fastapi import HTTPException, status
-from sqlalchemy import select, func
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from cad_service.models import CADModel
-from cad_worker.models import ModelFeature, ModelGeometry
-from ai_service.models import MachiningPlan as MachiningPlanModel
+
+# ── New pipeline modules ──────────────────────────────────────────────────────
+from ai_service.ingestion import fetch_model_intelligence, adapt_intelligence
+from ai_service.planning.base_plan_generator import generate_base_plan
+from ai_service.planning.llm_coplanner import refine_plan_with_llm
+from ai_service.planning.plan_validator import validate_llm_diff, validate_final_plan
+from ai_service.planning.plan_merger import merge_base_and_llm
+from ai_service.planning.strategy_generator import generate_strategies
+from ai_service.reasoning.narrative_generator import generate_narrative
+from ai_service.versioning.plan_version_service import PlanVersionService
+
 from ai_service.schemas.machining_plan import (
     MachiningPlanResponse,
-    ToolSpec,
-    OperationSpec,
-    SetupSpec,
     PlanningRequest,
 )
-from ai_service.services.rule_engine import plan_operations, group_into_setups
-from ai_service.services.time_estimator import estimate_operation_time, estimate_total_time
 
-# ── Hybrid layers ─────────────────────────────────────────────────────────────
+# ── Feature validation (kept from Phase A) ────────────────────────────────────
 from ai_service.services.feature_validator import FeatureValidator
 from ai_service.services.feature_validator.deterministic_validator import (
     DeterministicFeatureValidator,
 )
 from ai_service.services.feature_validator.validation_logger import ValidationLogger
-from ai_service.services.langchain_pipeline import optimize_plan
-from ai_service.services.plan_validator import PlanValidator, PlanValidationError
 
 logger = logging.getLogger(__name__)
 
@@ -70,16 +75,26 @@ async def generate_plan(
     validator: FeatureValidator | None = None,
 ) -> MachiningPlanResponse:
     """
-    Generate a versioned machining plan (approved=False).
+    Generate a versioned machining plan via the hybrid pipeline.
+
+    Steps:
+        1.  Validate inputs
+        2.  Fetch & adapt intelligence → PlanningContext
+        3.  Feature validation (DI)
+        4.  Deterministic base plan
+        5.  LLM co-planner → structured diff
+        6.  Validate diff → merge if safe
+        7.  Final plan validation
+        8.  Strategies + narrative
+        9.  Persist (version 1, approval_status=DRAFT)
 
     Args:
         req:        PlanningRequest with model_id, material, machine_type.
-        session:    Async DB session (commit handled by caller / DI).
-        validator:  Optional FeatureValidator override (DI).  Defaults to
-                    DeterministicFeatureValidator.
+        session:    Async DB session.
+        validator:  Optional FeatureValidator override (DI).
 
     Raises:
-        HTTPException on invalid input, missing data, or plan validation failure.
+        HTTPException on invalid input, missing data, or validation failure.
     """
 
     if validator is None:
@@ -105,54 +120,34 @@ async def generate_plan(
             detail=f"Model status is '{model.status}', must be READY for planning",
         )
 
-    # ── 3. Fetch geometry metadata ───────────────────────────────────────────
-    geom_result = await session.execute(
-        select(ModelGeometry).where(ModelGeometry.model_id == req.model_id)
-    )
-    geom = geom_result.scalars().first()
-    if geom is None or not geom.feature_ready:
+    # ── 3. Fetch ManufacturingGeometryReport ─────────────────────────────────
+    try:
+        intelligence = await fetch_model_intelligence(req.model_id)
+    except ValueError as exc:
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
-            detail="Feature extraction not ready (BRep required for planning)",
+            detail=f"Manufacturing intelligence not available: {exc}",
         )
 
-    geometry_metadata: dict = {
-        "volume": geom.volume,
-        "surface_area": geom.surface_area,
-        "bounding_box": geom.bounding_box or {},
-        "planar_faces": geom.planar_faces,
-        "cylindrical_faces": geom.cylindrical_faces,
-        "conical_faces": geom.conical_faces,
-        "spherical_faces": geom.spherical_faces,
-    }
-
-    # ── 4. Fetch raw features ────────────────────────────────────────────────
-    feat_result = await session.execute(
-        select(ModelFeature).where(ModelFeature.model_id == req.model_id)
+    # ── 4. Adapt to PlanningContext ──────────────────────────────────────────
+    context = adapt_intelligence(
+        intelligence,
+        material=req.material,
+        machine_type=req.machine_type,
     )
-    features_db = feat_result.scalars().all()
-    if not features_db:
+
+    if not context.features:
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-            detail="No features detected on this model — cannot generate plan",
+            detail="No features in intelligence report — cannot generate plan",
         )
 
-    raw_features: list[dict] = [
-        {
-            "id": f.id,
-            "type": f.type,
-            "confidence": getattr(f, "confidence", 1.0),
-            "dimensions": f.dimensions or {},
-            "depth": f.depth,
-            "diameter": f.diameter,
-            "axis": f.axis,
-        }
-        for f in features_db
-    ]
-
     # ── 5. Feature Validation Layer (ML boundary) ────────────────────────────
-    validated_features = validator.validate(raw_features, geometry_metadata)
-    if not validated_features:
+    raw_feature_dicts = [f.model_dump() for f in context.features]
+    geometry_dict = context.geometry.model_dump() if context.geometry else {}
+    validated_feature_dicts = validator.validate(raw_feature_dicts, geometry_dict)
+
+    if not validated_feature_dicts:
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
             detail="All features were rejected by validation — cannot generate plan",
@@ -160,155 +155,99 @@ async def generate_plan(
 
     logger.info(
         "Feature validation: %d raw → %d validated",
-        len(raw_features),
-        len(validated_features),
+        len(raw_feature_dicts),
+        len(validated_feature_dicts),
     )
 
     # ── 6. Validation Logging (non-blocking) ─────────────────────────────────
     vl = ValidationLogger(session)
     await vl.log(
         model_id=req.model_id,
-        raw_features=raw_features,
-        validated_features=validated_features,
-        geometry_snapshot=geometry_metadata,
+        raw_features=raw_feature_dicts,
+        validated_features=validated_feature_dicts,
+        geometry_snapshot=geometry_dict,
     )
 
-    # ── 7. Rule Engine ───────────────────────────────────────────────────────
-    planned_ops = plan_operations(validated_features, req.material, req.machine_type)
-    if not planned_ops:
+    # ── 7. Deterministic Base Plan ───────────────────────────────────────────
+    base_plan = generate_base_plan(context)
+
+    if not base_plan.operations:
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-            detail="Rule engine produced no operations — check features and machine type",
+            detail="Deterministic planner produced no operations — check features",
         )
 
-    # ── 8. Build tool de-duplication map + operation specs ───────────────────
-    tool_map: dict[str, ToolSpec] = {}
-    for op in planned_ops:
-        if op.tool and op.tool.id not in tool_map:
-            tool_map[op.tool.id] = ToolSpec(
-                id=op.tool.id,
-                type=op.tool.type,
-                diameter=op.tool.diameter,
-                max_depth=op.tool.max_depth,
-                recommended_rpm_min=op.tool.rpm_min,
-                recommended_rpm_max=op.tool.rpm_max,
+    logger.info(
+        "Base plan: %d ops, %d tools, %d setups, %.1fs",
+        len(base_plan.operations),
+        len(base_plan.tools),
+        len(base_plan.setups),
+        base_plan.estimated_time,
+    )
+
+    # ── 8. LLM Co-Planner → structured diff ─────────────────────────────────
+    llm_diff = await refine_plan_with_llm(base_plan, context)
+
+    final_plan = base_plan  # default: use base plan as-is
+
+    if not llm_diff.is_empty:
+        # ── 9. Validate the diff ─────────────────────────────────────────────
+        diff_result = validate_llm_diff(base_plan, llm_diff, context)
+
+        if diff_result.valid:
+            # ── 10. Merge validated diff into base plan ──────────────────────
+            merged = merge_base_and_llm(base_plan, llm_diff)
+
+            # ── 11. Validate the merged plan ─────────────────────────────────
+            plan_result = validate_final_plan(merged, context)
+            if plan_result.valid:
+                final_plan = merged
+                final_plan.llm_justification = llm_diff.justification
+                logger.info(
+                    "LLM diff applied: %d changes, justification=%s",
+                    llm_diff.change_count,
+                    (llm_diff.justification or "")[:80],
+                )
+            else:
+                logger.warning(
+                    "Merged plan failed final validation (%s) — using base plan",
+                    plan_result.errors[:3],
+                )
+        else:
+            logger.warning(
+                "LLM diff rejected by validator (%s) — using base plan",
+                diff_result.errors[:3],
             )
-
-    operation_specs: list[OperationSpec] = []
-    operation_times: list[float] = []
-
-    for op in planned_ops:
-        tool_type = op.tool.type if op.tool else "FLAT_END_MILL"
-        tool_dia = op.tool.diameter if op.tool else 10.0
-        tool_id = op.tool.id if op.tool else "unknown"
-
-        t = estimate_operation_time(
-            op_type=op.op_type,
-            tool_type=tool_type,
-            tool_diameter=tool_dia,
-            material=req.material,
-            parameters=op.parameters,
+    else:
+        logger.info("LLM co-planner returned empty diff — base plan is optimal")
+        final_plan.generation_explanation = (
+            "Deterministic plan — LLM found no improvements."
         )
-        operation_times.append(t)
 
-        operation_specs.append(OperationSpec(
-            id=op.id,
-            feature_id=op.feature_id,
-            type=op.op_type,
-            tool_id=tool_id,
-            parameters=op.parameters,
-            estimated_time=round(t, 2),
-        ))
+    # ── 12. Strategy Generation ──────────────────────────────────────────────
+    strategies = generate_strategies(base_plan, final_plan, context)
+    final_plan.strategies = strategies
+    if strategies:
+        final_plan.selected_strategy = strategies[0].name  # default: first
 
-    total_time = round(estimate_total_time(operation_times), 2)
-
-    # ── 9. Group into setups ─────────────────────────────────────────────────
-    setup_dicts = group_into_setups(planned_ops, req.machine_type)
-    setup_specs = [
-        SetupSpec(
-            setup_id=s["setup_id"],
-            orientation=s["orientation"],
-            operations=s["operations"],
-        )
-        for s in setup_dicts
-    ]
-
-    # ── 10. Build baseline plan dict ─────────────────────────────────────────
-    base_plan = MachiningPlanResponse(
-        model_id=req.model_id,
-        material=req.material,
-        machine_type=req.machine_type,
-        setups=setup_specs,
-        operations=operation_specs,
-        tools=list(tool_map.values()),
-        estimated_time=total_time,
-        version=1,       # placeholder — final version computed below
-        approved=False,
-    )
-    base_plan_dict = base_plan.model_dump()
-
-    # ── 11. LangChain optimiser (optional, graceful fallback) ────────────────
-    optimised_dict = await optimize_plan(
-        base_plan=base_plan_dict,
-        validated_features=validated_features,
-        material=req.material,
-        machine_type=req.machine_type,
-    )
-
-    # ── 12. Plan Validator ───────────────────────────────────────────────────
-    pv = PlanValidator(validated_features, req.material, req.machine_type)
-    explanation = optimised_dict.pop("explanation", None)
+    # ── 13. Narrative Generation (async, graceful fallback) ──────────────────
     try:
-        validated_plan_dict = pv.validate(optimised_dict)
-        if explanation:
-            validated_plan_dict["generation_explanation"] = explanation
-    except PlanValidationError as exc:
-        logger.warning(
-            "LLM-optimised plan failed validation (%s) — falling back to baseline",
-            exc.errors,
-        )
-        # Validate baseline as safety net (should always pass)
-        try:
-            validated_plan_dict = pv.validate(base_plan_dict)
-            validated_plan_dict["generation_explanation"] = "Baseline plan generated using deterministic rules."
-        except PlanValidationError:
-            raise HTTPException(
-                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail="Both optimised and baseline plans failed validation",
-            )
+        narrative = await generate_narrative(final_plan, context)
+    except Exception:
+        logger.debug("Narrative generation failed — continuing without it")
+        narrative = None
 
-    # ── 13. Compute next version ─────────────────────────────────────────────
-    max_version_result = await session.execute(
-        select(func.coalesce(func.max(MachiningPlanModel.version), 0)).where(
-            MachiningPlanModel.model_id == req.model_id
-        )
+    # ── 14. Persist versioned plan ───────────────────────────────────────────
+    version_svc = PlanVersionService(session)
+    plan_row = await version_svc.save_initial_plan(
+        plan=final_plan,
+        process_summary=narrative,
     )
-    next_version: int = max_version_result.scalar_one() + 1
-
-    # ── 14. Assemble final response ──────────────────────────────────────────
-    # Overlay version + approved onto validated plan
-    validated_plan_dict["version"] = next_version
-    validated_plan_dict["approved"] = False
-
-    final_plan = MachiningPlanResponse(**validated_plan_dict)
-
-    # ── 15. Persist to DB (approved=False) ───────────────────────────────────
-    plan_row = MachiningPlanModel(
-        id=str(uuid.uuid4()),
-        model_id=req.model_id,
-        material=req.material,
-        machine_type=req.machine_type,
-        plan_data=final_plan.model_dump(),
-        estimated_time=final_plan.estimated_time,
-        version=next_version,
-        approved=False,
-    )
-    session.add(plan_row)
 
     logger.info(
         "Generated plan v%d for model=%s: %d ops, %d tools, %.1f s total "
-        "(approved=False)",
-        next_version,
+        "(approval_status=DRAFT)",
+        final_plan.version,
         req.model_id,
         len(final_plan.operations),
         len(final_plan.tools),

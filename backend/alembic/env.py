@@ -21,6 +21,8 @@ from cad_service.models import CADModel       # noqa: F401
 from cad_worker.models import ModelGeometry   # noqa: F401
 from cad_worker.models import ModelFeature    # noqa: F401
 from ai_service.models import MachiningPlan   # noqa: F401
+from ai_service.models import FeatureValidationLog  # noqa: F401
+from ai_service.models import PlanFeedback    # noqa: F401
 
 settings = get_settings()
 config = context.config

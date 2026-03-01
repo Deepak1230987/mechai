@@ -4,6 +4,7 @@ from .cad_service import (
     list_user_models,
     get_model,
     get_viewer_url,
+    get_model_intelligence,
 )
 
 __all__ = [
@@ -12,4 +13,5 @@ __all__ = [
     "list_user_models",
     "get_model",
     "get_viewer_url",
+    "get_model_intelligence",
 ]

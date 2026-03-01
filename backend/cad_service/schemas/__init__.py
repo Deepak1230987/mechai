@@ -55,6 +55,23 @@ class FeatureResponse(BaseModel):
     model_config = {"from_attributes": True}
 
 
+# ── Intelligence Response ─────────────────────────────────────────────────────
+
+class IntelligenceResponse(BaseModel):
+    """
+    Manufacturing intelligence for a CAD model.
+
+    This is the API contract between CAD Service and AI Service.
+    The manufacturing_geometry_report is the single source of truth
+    for all downstream planning and analysis.
+    """
+    model_id: str
+    intelligence_ready: bool
+    manufacturing_geometry_report: dict
+
+    model_config = {"from_attributes": True}
+
+
 # ── Responses ─────────────────────────────────────────────────────────────────
 
 class UploadResponse(BaseModel):
@@ -73,6 +90,7 @@ class ModelResponse(BaseModel):
     status: str
     visibility: str
     created_at: datetime
+    intelligence_ready: bool = False
     geometry: GeometryResponse | None = None
     features: list[FeatureResponse] | None = None
     gltf_url: str | None = None

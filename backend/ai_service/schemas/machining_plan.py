@@ -66,9 +66,40 @@ class SetupSpec(BaseModel):
         ...,
         description="Workpiece orientation label, e.g. 'TOP', 'FRONT', 'CHUCK_Z'",
     )
+    datum_face_id: str | None = Field(
+        None, description="Primary datum face used for this setup"
+    )
     operations: list[str] = Field(
         default_factory=list,
         description="Ordered list of operation IDs executed in this setup",
+    )
+
+
+# ── Risk ──────────────────────────────────────────────────────────────────────
+
+class RiskItem(BaseModel):
+    """A manufacturing risk attached to one or more operations."""
+
+    code: str = Field(..., description="Risk code, e.g. THIN_WALL, DEEP_POCKET")
+    severity: str = Field("WARNING", description="WARNING | CRITICAL")
+    message: str = ""
+    affected_operation_ids: list[str] = Field(default_factory=list)
+    mitigation: str = Field("", description="Recommended mitigation action")
+
+
+# ── Strategy ──────────────────────────────────────────────────────────────────
+
+class StrategyVariant(BaseModel):
+    """One planning strategy variant (conservative / optimized / aggressive)."""
+
+    name: str = Field(..., description="CONSERVATIVE | OPTIMIZED | AGGRESSIVE")
+    description: str = ""
+    estimated_time: float = Field(0, ge=0)
+    setup_count: int = Field(0, ge=0)
+    operation_count: int = Field(0, ge=0)
+    changes_from_base: list[str] = Field(
+        default_factory=list,
+        description="Human-readable list of changes vs. base plan",
     )
 
 
@@ -87,6 +118,22 @@ class MachiningPlanResponse(BaseModel):
     setups: list[SetupSpec]
     operations: list[OperationSpec]
     tools: list[ToolSpec]
+    risks: list[RiskItem] = Field(
+        default_factory=list,
+        description="Manufacturing risk warnings attached to operations",
+    )
+    strategies: list[StrategyVariant] = Field(
+        default_factory=list,
+        description="Available strategy variants (conservative / optimized / aggressive)",
+    )
+    selected_strategy: str = Field(
+        "CONSERVATIVE",
+        description="Currently active strategy: CONSERVATIVE | OPTIMIZED | AGGRESSIVE",
+    )
+    llm_justification: str | None = Field(
+        None,
+        description="LLM co-planner's justification for optimizations applied",
+    )
     estimated_time: float = Field(
         0,
         ge=0,
@@ -100,6 +147,10 @@ class MachiningPlanResponse(BaseModel):
     approved: bool = Field(
         False,
         description="Human approval flag — always False on creation",
+    )
+    approval_status: str = Field(
+        "DRAFT",
+        description="DRAFT | PENDING_REVIEW | APPROVED | REJECTED",
     )
     approved_by: str | None = Field(
         None,
