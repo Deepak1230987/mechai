@@ -164,6 +164,14 @@ class MachiningPlanResponse(BaseModel):
         None,
         description="The AI's explanation for how it generated/optimized this plan",
     )
+    is_rollback: bool = Field(
+        False,
+        description="True if this version was created via rollback",
+    )
+    parent_version_id: str | None = Field(
+        None,
+        description="ID of the version this was rolled back from (null for non-rollback)",
+    )
 
 
 # ── Request ───────────────────────────────────────────────────────────────────
@@ -239,3 +247,21 @@ class VersionSummary(BaseModel):
     created_at: str
     estimated_time: float = 0
     operation_count: int = 0
+    is_rollback: bool = False
+    modification_reason: str | None = None
+
+
+class RollbackRequest(BaseModel):
+    """Input payload for POST /planning/{model_id}/rollback."""
+
+    target_version: int = Field(
+        ...,
+        ge=1,
+        description="Version number to roll back to",
+    )
+    reason: str = Field(
+        ...,
+        min_length=1,
+        max_length=500,
+        description="Reason for the rollback",
+    )

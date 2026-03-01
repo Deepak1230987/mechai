@@ -46,6 +46,7 @@ from ai_service.planning.plan_merger import merge_base_and_llm
 from ai_service.planning.strategy_generator import generate_strategies
 from ai_service.reasoning.narrative_generator import generate_narrative
 from ai_service.versioning.plan_version_service import PlanVersionService
+from ai_service.versioning.rollback_service import RollbackService
 
 from ai_service.schemas.machining_plan import (
     MachiningPlanResponse,
@@ -254,3 +255,59 @@ async def generate_plan(
         final_plan.estimated_time,
     )
     return final_plan
+
+
+# ── Rollback (separate from base planning — does NOT re-trigger LLM) ─────────
+
+async def rollback_plan(
+    model_id: str,
+    target_version: int,
+    reason: str,
+    session: AsyncSession,
+) -> MachiningPlanResponse:
+    """
+    Roll back to a previous plan version.
+
+    Creates a new immutable version with is_rollback=True.
+    Does NOT re-trigger LLM or base planning logic.
+
+    Args:
+        model_id:       The model to roll back.
+        target_version: Version number to restore.
+        reason:         Human-readable rollback reason.
+        session:        Async DB session.
+
+    Returns:
+        MachiningPlanResponse for the newly created rollback version.
+
+    Raises:
+        HTTPException on invalid target version.
+    """
+    rollback_svc = RollbackService(session)
+
+    try:
+        row = await rollback_svc.rollback_to_version(
+            model_id=model_id,
+            target_version_number=target_version,
+            reason=reason,
+        )
+    except ValueError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=str(exc),
+        )
+
+    response = MachiningPlanResponse(**row.plan_data)
+    response.plan_id = row.id
+    response.version = row.version
+    response.is_rollback = True
+    response.parent_version_id = row.parent_version_id
+
+    logger.info(
+        "Rollback complete: model=%s target_v=%d → new_v=%d (reason=%s)",
+        model_id,
+        target_version,
+        row.version,
+        reason[:80],
+    )
+    return response

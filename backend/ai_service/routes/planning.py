@@ -6,7 +6,9 @@ Planning routes:
     POST /planning/{plan_id}/chat     — conversational refinement
     POST /planning/{plan_id}/narrative — generate process narrative
     POST /planning/{plan_id}/export   — PDF export
+    POST /planning/{model_id}/rollback — restore a previous version
     GET  /planning/{model_id}/latest  — fetch latest version
+    GET  /planning/{model_id}/versions — version list
 """
 
 from __future__ import annotations
@@ -26,6 +28,7 @@ from ai_service.schemas.machining_plan import (
     PlanUpdateResponse,
     PlanDiff,
     VersionSummary,
+    RollbackRequest,
 )
 from ai_service.schemas.chat_message import ChatRequest, ChatResponse
 from ai_service.schemas.process_document import (
@@ -33,7 +36,7 @@ from ai_service.schemas.process_document import (
     NarrativeResponse,
     ExportRequest,
 )
-from ai_service.services.planning_service import generate_plan
+from ai_service.services.planning_service import generate_plan, rollback_plan
 from ai_service.services.feedback_service import (
     apply_edit,
     approve_plan,
@@ -43,6 +46,7 @@ from ai_service.chat.intent_router import IntentRouter, IntentType
 from ai_service.chat.refinement_engine import generate_refinement_diff
 from ai_service.chat.consent_manager import ConsentManager
 from ai_service.reasoning.narrative_generator import generate_narrative
+from ai_service.reasoning.alternative_generator import generate_alternatives
 from ai_service.services.document_service import generate_plan_pdf
 
 logger = logging.getLogger(__name__)
@@ -58,7 +62,7 @@ planning_router = APIRouter(prefix="/planning", tags=["planning"])
     summary="Generate versioned machining plan (hybrid pipeline)",
     description=(
         "Full hybrid planning pipeline: "
-        "validates features → rule engine → optional LLM optimiser → "
+        "validates features  → optional LLM optimiser → "
         "plan validation → save as new version with approved=False."
     ),
 )
@@ -238,14 +242,125 @@ async def chat(
         )
 
     # ── Handle general conversation ──────────────────────────────────────
-    if intent == IntentType.GENERAL_CONVERSATION:
-        response_text = await router.conversational_response(req.user_message)
+    if intent == "GENERAL_CONVERSATION":
+        # Build a brief plan summary for context
+        plan_row_conv = await session.get(MachiningPlanModel, plan_id)
+        plan_summary = "No plan loaded."
+        if plan_row_conv:
+            pd = plan_row_conv.plan_data
+            plan_summary = (
+                f"Material: {plan_row_conv.material}, "
+                f"Machine: {plan_row_conv.machine_type}, "
+                f"Ops: {len(pd.get('operations', []))}, "
+                f"Time: {pd.get('estimated_time', 0):.1f}s, "
+                f"Version: {plan_row_conv.version}"
+            )
+        response_text = await router.conversational_response(
+            req.user_message, plan_summary
+        )
         return ChatResponse(
             type="conversation",
             message=response_text,
         )
 
-    # ── Handle plan modification / request alternatives ──────────────────
+    # ── Handle rollback ──────────────────────────────────────────────────
+    if intent == "ROLLBACK":
+        target_v = IntentRouter.parse_rollback_version(req.user_message)
+        if target_v is None:
+            return ChatResponse(
+                type="conversation",
+                message="I understood you want to roll back, but I couldn't determine "
+                        "the target version. Please say something like "
+                        "'rollback to version 2' or 'undo last change'.",
+            )
+
+        # Resolve plan_id → model_id
+        rollback_plan_row = await session.get(MachiningPlanModel, plan_id)
+        if rollback_plan_row is None:
+            from fastapi import HTTPException, status as http_status
+            raise HTTPException(
+                status_code=http_status.HTTP_404_NOT_FOUND,
+                detail=f"Plan {plan_id} not found",
+            )
+
+        model_id = rollback_plan_row.model_id
+
+        # Resolve -1 sentinel → previous version
+        if target_v == -1:
+            target_v = max(rollback_plan_row.version - 1, 1)
+
+        try:
+            restored = await rollback_plan(
+                model_id=model_id,
+                target_version=target_v,
+                reason=f"Chat rollback: {req.user_message[:200]}",
+                session=session,
+            )
+        except Exception as exc:
+            return ChatResponse(
+                type="conversation",
+                message=f"Rollback failed: {exc}",
+            )
+
+        return ChatResponse(
+            type="plan_update",
+            explanation=f"Rolled back to version {target_v}. "
+                        f"Created new version {restored.version} (rollback).",
+            machining_plan=restored,
+            version=restored.version,
+        )
+
+    # ── Handle request alternatives ──────────────────────────────────────
+    if intent == "REQUEST_ALTERNATIVES":
+        alt_plan_row = await session.get(MachiningPlanModel, plan_id)
+        if alt_plan_row is None:
+            from fastapi import HTTPException, status as http_status
+            raise HTTPException(
+                status_code=http_status.HTTP_404_NOT_FOUND,
+                detail=f"Plan {plan_id} not found",
+            )
+
+        alt_plan_response = MachiningPlanResponse(**alt_plan_row.plan_data)
+        alt_plan_response.plan_id = alt_plan_row.id
+
+        # Build PlanningContext from plan data
+        alt_features = []
+        alt_seen: set[str] = set()
+        for op in alt_plan_row.plan_data.get("operations", []):
+            fid = op.get("feature_id")
+            if fid and fid not in alt_seen:
+                alt_seen.add(fid)
+                alt_features.append(
+                    FeatureContext(id=fid, type="UNKNOWN", confidence=1.0)
+                )
+        alt_context = PlanningContext(
+            model_id=alt_plan_row.model_id,
+            material=alt_plan_row.material,
+            machine_type=alt_plan_row.machine_type,
+            features=alt_features,
+        )
+
+        alternatives = await generate_alternatives(alt_plan_response, alt_context)
+        if not alternatives.proposals:
+            return ChatResponse(
+                type="conversation",
+                message="No alternative suggestions at this time.",
+            )
+
+        # Format alternatives as readable message
+        lines = ["**Alternative Suggestions:**\n"]
+        for i, p in enumerate(alternatives.proposals, 1):
+            lines.append(
+                f"{i}. **{p.category}**: {p.description}\n"
+                f"   Impact: {p.estimated_impact}\n"
+                f"   Trade-off: {p.trade_off}"
+            )
+        return ChatResponse(
+            type="conversation",
+            message="\n".join(lines),
+        )
+
+    # ── Handle plan modification ─────────────────────────────────────────
     plan_row = await session.get(MachiningPlanModel, plan_id)
     if plan_row is None:
         from fastapi import HTTPException, status as http_status
@@ -454,6 +569,38 @@ async def export_pdf(
         },
     )
 
+
+# ── Version Rollback ──────────────────────────────────────────────────────────
+
+@planning_router.post(
+    "/{model_id}/rollback",
+    response_model=MachiningPlanResponse,
+    summary="Roll back to a previous plan version",
+    description=(
+        "Creates a new immutable version whose plan_data is cloned from "
+        "the specified target version.  The new row has is_rollback=True "
+        "and parent_version_id pointing at the source.  "
+        "History is never deleted."
+    ),
+)
+async def rollback(
+    model_id: str,
+    req: RollbackRequest,
+    session: AsyncSession = Depends(get_session),
+) -> MachiningPlanResponse:
+    logger.info(
+        "Rollback request: model=%s target_version=%d reason=%s",
+        model_id, req.target_version, req.reason[:120],
+    )
+    restored = await rollback_plan(
+        model_id=model_id,
+        target_version=req.target_version,
+        reason=req.reason,
+        session=session,
+    )
+    return restored
+
+
 # ── Version History ───────────────────────────────────────────────────────────
 
 @planning_router.get(
@@ -499,6 +646,8 @@ async def list_versions(
             created_at=p.created_at.isoformat() if p.created_at else "",
             estimated_time=p.estimated_time,
             operation_count=op_count,
+            is_rollback=getattr(p, 'is_rollback', False),
+            modification_reason=p.modification_reason,
         ))
 
     return summaries

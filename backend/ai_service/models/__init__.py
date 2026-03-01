@@ -93,6 +93,18 @@ class MachiningPlan(Base):
         default=None,
         comment="Why this version was created (e.g. 'User confirmed tool change')",
     )
+    parent_version_id: Mapped[Optional[str]] = mapped_column(
+        String(36),
+        nullable=True,
+        default=None,
+        comment="ID of the version this was rolled back from (NULL for non-rollback)",
+    )
+    is_rollback: Mapped[bool] = mapped_column(
+        Boolean,
+        nullable=False,
+        default=False,
+        comment="True if this version was created via rollback",
+    )
     approval_status: Mapped[str] = mapped_column(
         String(20),
         nullable=False,

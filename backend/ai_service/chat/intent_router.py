@@ -28,6 +28,7 @@ IntentType = Literal[
     "CONFIRM_CHANGE",
     "REJECT_CHANGE",
     "REQUEST_ALTERNATIVES",
+    "ROLLBACK",
 ]
 
 # ── Keyword sets ──────────────────────────────────────────────────────────────
@@ -44,8 +45,13 @@ _CONFIRM_KEYWORDS = [
 ]
 
 _REJECT_KEYWORDS = [
-    "reject", "cancel", "no", "undo", "discard", "revert", "nevermind",
+    "reject", "cancel", "no", "discard", "nevermind",
     "never mind", "forget it",
+]
+
+_ROLLBACK_KEYWORDS = [
+    "rollback", "roll back", "revert", "go back to version",
+    "undo last change", "restore version", "previous version",
 ]
 
 _ALTERNATIVES_KEYWORDS = [
@@ -91,6 +97,11 @@ class IntentRouter:
             if kw in msg_lower:
                 return "REJECT_CHANGE"
 
+        # Rollback keywords (before modification — "revert" etc.)
+        for kw in _ROLLBACK_KEYWORDS:
+            if kw in msg_lower:
+                return "ROLLBACK"
+
         # Alternatives request
         for kw in _ALTERNATIVES_KEYWORDS:
             if kw in msg_lower:
@@ -129,3 +140,31 @@ class IntentRouter:
         except Exception:
             logger.exception("Conversational LLM call failed")
             return "I'm having trouble processing that right now."
+
+    @staticmethod
+    def parse_rollback_version(user_message: str) -> int | None:
+        """
+        Extract a version number from a rollback request.
+
+        Handles patterns like:
+          - "rollback to version 3"
+          - "revert to v2"
+          - "go back to version 1"
+          - "undo last change"  (returns -1 = means "previous")
+
+        Returns:
+            Version number (int), -1 for "previous", or None if not parseable.
+        """
+        import re
+        msg = user_message.lower().strip()
+
+        # Explicit version number
+        m = re.search(r"(?:version|v)\s*(\d+)", msg)
+        if m:
+            return int(m.group(1))
+
+        # "undo last change" → previous version
+        if "undo" in msg or "last change" in msg or "previous" in msg:
+            return -1  # sentinel: resolve to latest - 1
+
+        return None
