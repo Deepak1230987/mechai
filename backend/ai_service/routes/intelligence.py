@@ -135,10 +135,11 @@ async def cost_breakdown(
     model_id: str,
     version: int | None = Query(None, ge=1),
     plan_id: str | None = Query(None),
+    strategy: str | None = Query(None),
     session: AsyncSession = Depends(get_session),
 ) -> IntelligenceResponse:
     result = await handle_conversational_query(
-        user_message="cost breakdown",
+        user_message=f"cost breakdown{' for ' + strategy + ' strategy' if strategy else ''}",
         model_id=model_id,
         session=session,
         plan_id=plan_id,
@@ -162,10 +163,11 @@ async def time_breakdown(
     model_id: str,
     version: int | None = Query(None, ge=1),
     plan_id: str | None = Query(None),
+    strategy: str | None = Query(None),
     session: AsyncSession = Depends(get_session),
 ) -> IntelligenceResponse:
     result = await handle_conversational_query(
-        user_message="time breakdown",
+        user_message=f"time breakdown{' for ' + strategy + ' strategy' if strategy else ''}",
         model_id=model_id,
         session=session,
         plan_id=plan_id,
@@ -424,4 +426,36 @@ async def explain_operation_endpoint(
         type="operation_explanation",
         data=explanation.model_dump(),
         message=explanation.explanation,
+    )
+
+
+# ── Initial Narrative ─────────────────────────────────────────────────────────
+
+@intelligence_router.get(
+    "/{model_id}/narrative",
+    response_model=IntelligenceResponse,
+    summary="Get initial comprehensive manufacturing narrative",
+    description=(
+        "Generates a detailed initial explanation of the machining plan "
+        "including setup reasoning, operation sequence, tool selection, "
+        "strategy explanation, risk assessment, and cost reasoning."
+    ),
+)
+async def initial_narrative(
+    model_id: str,
+    version: int | None = Query(None, ge=1),
+    plan_id: str | None = Query(None),
+    session: AsyncSession = Depends(get_session),
+) -> IntelligenceResponse:
+    from ai_service.conversation.context_builder import build_conversation_context
+    from ai_service.conversation.narrative_builder import build_initial_narrative
+
+    ctx = await build_conversation_context(
+        model_id, session, version=version, plan_id=plan_id,
+    )
+    narrative = build_initial_narrative(ctx)
+    return IntelligenceResponse(
+        type="initial_narrative",
+        data=narrative,
+        message=narrative.get("full_text", ""),
     )

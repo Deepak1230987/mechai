@@ -4,7 +4,14 @@
 
 import { useCallback, useState } from "react";
 import { useWorkspaceStore } from "@/store/workspaceStore";
-import { rollbackPlan, listVersions } from "@/lib/intelligence-api";
+import {
+  rollbackPlan,
+  listVersions,
+  getCostBreakdown,
+  getTimeBreakdown,
+  getSpatialMap,
+} from "@/lib/intelligence-api";
+import { getLatestPlan } from "@/lib/planning-api";
 import type { VersionInfo } from "@/types/intelligence";
 
 export function useVersioning() {
@@ -12,6 +19,11 @@ export function useVersioning() {
     modelId,
     versionHistory,
     setVersionHistory,
+    setPlan,
+    setCost,
+    setTime,
+    setSpatialMap,
+    setProcessingStage,
     plan,
   } = useWorkspaceStore();
   const [isRollingBack, setIsRollingBack] = useState(false);
@@ -30,17 +42,39 @@ export function useVersioning() {
     async (targetVersion: number): Promise<boolean> => {
       if (!modelId) return false;
       setIsRollingBack(true);
+      setProcessingStage("optimizing");
       try {
         await rollbackPlan(modelId, targetVersion);
-        await refreshVersions();
+
+        // Full reload: plan, intelligence data, and versions
+        const [planData, costRes, timeRes, spatialRes, versions] =
+          await Promise.allSettled([
+            getLatestPlan(modelId),
+            getCostBreakdown(modelId),
+            getTimeBreakdown(modelId),
+            getSpatialMap(modelId),
+            listVersions(modelId),
+          ]);
+
+        if (planData.status === "fulfilled" && planData.value) {
+          setPlan(planData.value);
+        }
+        if (costRes.status === "fulfilled") setCost(costRes.value.data);
+        if (timeRes.status === "fulfilled") setTime(timeRes.value.data);
+        if (spatialRes.status === "fulfilled") setSpatialMap(spatialRes.value.data);
+        if (versions.status === "fulfilled") {
+          setVersionHistory(versions.value as VersionInfo[]);
+        }
+
         return true;
       } catch {
         return false;
       } finally {
         setIsRollingBack(false);
+        setProcessingStage("idle");
       }
     },
-    [modelId, refreshVersions],
+    [modelId, setPlan, setCost, setTime, setSpatialMap, setVersionHistory, setProcessingStage],
   );
 
   return {

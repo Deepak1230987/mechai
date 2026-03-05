@@ -36,13 +36,39 @@ export async function queryIntelligence(
     return data;
 }
 
+// ─── Narrative ───────────────────────────────────────────────────────────────
+
+export interface NarrativeData {
+    sections: { title: string; icon: string; content: string }[];
+    full_text: string;
+    model_id: string;
+    plan_id: string;
+    version: number;
+    strategy: string;
+}
+
+export async function getNarrative(
+    modelId: string,
+    version?: number,
+): Promise<IntelligenceResponse<NarrativeData>> {
+    const params = version ? { version } : {};
+    const { data } = await api.get<IntelligenceResponse<NarrativeData>>(
+        `/intelligence/${modelId}/narrative`,
+        { params },
+    );
+    return data;
+}
+
 // ─── Cost ────────────────────────────────────────────────────────────────────
 
 export async function getCostBreakdown(
     modelId: string,
     version?: number,
+    strategy?: string,
 ): Promise<IntelligenceResponse<CostBreakdown>> {
-    const params = version ? { version } : {};
+    const params: Record<string, unknown> = {};
+    if (version) params.version = version;
+    if (strategy) params.strategy = strategy;
     const { data } = await api.get<IntelligenceResponse<CostBreakdown>>(
         `/intelligence/${modelId}/cost`,
         { params },
@@ -55,8 +81,11 @@ export async function getCostBreakdown(
 export async function getTimeBreakdown(
     modelId: string,
     version?: number,
+    strategy?: string,
 ): Promise<IntelligenceResponse<TimeBreakdown>> {
-    const params = version ? { version } : {};
+    const params: Record<string, unknown> = {};
+    if (version) params.version = version;
+    if (strategy) params.strategy = strategy;
     const { data } = await api.get<IntelligenceResponse<TimeBreakdown>>(
         `/intelligence/${modelId}/time`,
         { params },

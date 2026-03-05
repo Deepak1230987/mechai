@@ -26,8 +26,8 @@ export function useStrategy() {
 
       try {
         const [costRes, timeRes] = await Promise.all([
-          getCostBreakdown(modelId),
-          getTimeBreakdown(modelId),
+          getCostBreakdown(modelId, undefined, strategyName),
+          getTimeBreakdown(modelId, undefined, strategyName),
         ]);
         setCost(costRes.data);
         setTime(timeRes.data);

@@ -77,6 +77,49 @@ _PACKET_KEYWORDS = ["manufacturing packet", "machining packet", "build packet"]
 _RFQ_KEYWORDS = ["rfq", "request for quote", "quote packet", "vendor packet"]
 _PDF_KEYWORDS = ["industrial pdf", "full report", "industrial report", "detailed pdf"]
 
+# Strategy switch via chat (e.g. "use aggressive strategy", "switch to optimized")
+_STRATEGY_CHANGE_RE = re.compile(
+    r"(?:use|using|switch\s+to|try|select|apply|change\s+(?:to|strategy\s+to)|make\s+(?:a\s+)?plan\s+(?:with|using))\s+"
+    r"(?:the\s+)?"
+    r"(aggressive|optimized|optimised|conservative)"
+    r"(?:\s+(?:strategy|plan|mode))?"
+    r"|"
+    r"(aggressive|optimized|optimised|conservative)"
+    r"\s+(?:strategy|plan|mode)\s+(?:to\s+)?(?:make|generate|create|build)",
+    re.IGNORECASE,
+)
+_STRATEGY_ALIAS = {
+    "optimised": "OPTIMIZED",
+    "optimized": "OPTIMIZED",
+    "aggressive": "AGGRESSIVE",
+    "conservative": "CONSERVATIVE",
+}
+
+# Greetings / conversational openers — always go to conversational engine
+_GREETING_PATTERNS = [
+    "hi", "hello", "hey", "good morning", "good afternoon", "good evening",
+    "what can you do", "help", "who are you", "what are you",
+    "thanks", "thank you", "ok", "okay", "sure", "great", "nice",
+    "summarize", "summary", "overview", "tell me about this",
+    "explain this plan", "walk me through",
+]
+
+# Natural questions that should go to conversational engine, not general handler
+# (e.g. "which tool to use for X", "why this tool", "should I...")
+_CONVERSATIONAL_PATTERNS = [
+    r"\bwhich\b.*\bfor\b",   # "which tool for hole"
+    r"\bwhy\b",               # "why did you choose..."
+    r"\bshould\b",            # "should I..."
+    r"\bcan (we|i|you)\b",   # "can we use..."
+    r"\brecommend\b",         # "recommend..."
+    r"\bbetter\b",            # "is X better than Y"
+    r"\bbest\b",              # "best tool for..."
+    r"\bprefer\b",            # "prefer..."
+    r"\bhow (do|does|would|should|can)\b",  # "how do I..."
+    r"\btell me\b",           # "tell me about..."
+    r"\bexplain\b(?!.*\b(feature|operation)\s+[a-zA-Z0-9_-]+)",  # "explain..." but not "explain feature X"
+]
+
 
 class ConversationalQueryType:
     """Enumeration of Phase C query types."""
@@ -91,6 +134,7 @@ class ConversationalQueryType:
     MACHINING_PACKET = "machining_packet"
     RFQ_PACKET = "rfq_packet"
     INDUSTRIAL_PDF = "industrial_pdf"
+    STRATEGY_CHANGE = "strategy_change"
     CONVERSATION = "conversation"
     MODIFICATION_REDIRECT = "modification_redirect"
 
@@ -102,6 +146,18 @@ def _classify_query(user_message: str) -> tuple[str, dict[str, Any]]:
     Returns (query_type, metadata).
     """
     lower = user_message.lower().strip()
+
+    # ── Greetings / conversational openers → always LLM/conversation ─────
+    if lower in _GREETING_PATTERNS or any(lower.startswith(g) for g in _GREETING_PATTERNS):
+        return ConversationalQueryType.CONVERSATION, {}
+
+    # ── Strategy switch via chat ─────────────────────────────────────────
+    m_strat = _STRATEGY_CHANGE_RE.search(user_message)
+    if m_strat:
+        raw = (m_strat.group(1) or m_strat.group(2) or "").lower()
+        target = _STRATEGY_ALIAS.get(raw, raw.upper())
+        if target:
+            return ConversationalQueryType.STRATEGY_CHANGE, {"strategy": target}
 
     # Explain feature
     m = _EXPLAIN_FEATURE_RE.search(user_message)
@@ -143,7 +199,13 @@ def _classify_query(user_message: str) -> tuple[str, dict[str, Any]]:
     if any(kw in lower for kw in _PDF_KEYWORDS):
         return ConversationalQueryType.INDUSTRIAL_PDF, {}
 
-    # General deterministic query
+    # ── Natural / advisory questions → LLM/conversation engine ───────────
+    # (e.g. "which tool for hole", "why this setup", "should I use X")
+    for pattern in _CONVERSATIONAL_PATTERNS:
+        if re.search(pattern, lower):
+            return ConversationalQueryType.CONVERSATION, {}
+
+    # General deterministic query (strict data lookups)
     if classify_general_query(user_message) is not None:
         return ConversationalQueryType.GENERAL, {}
 
@@ -193,6 +255,8 @@ async def handle_conversational_query(
     ctx = await build_conversation_context(
         model_id, session, version=version, plan_id=plan_id,
     )
+    # Attach part_name so handlers can reference it
+    ctx.part_name = part_name or ""
 
     # ── Classify ─────────────────────────────────────────────────────────
     qtype, meta = _classify_query(user_message)
@@ -203,9 +267,55 @@ async def handle_conversational_query(
 
     # ── Route ────────────────────────────────────────────────────────────
 
+    # Strategy change — actionable by the frontend
+    if qtype == ConversationalQueryType.STRATEGY_CHANGE:
+        target = meta["strategy"]
+        current = ctx.selected_strategy
+        # Find target strategy details
+        target_strat = next(
+            (s for s in ctx.strategies if s.name == target), None
+        )
+        if target == current:
+            return {
+                "type": "conversation",
+                "data": None,
+                "message": (
+                    f"You're already using the **{current}** strategy. "
+                    f"Ask me about the other strategies or say "
+                    f"\"compare strategies\" for a full breakdown."
+                ),
+            }
+        if target_strat:
+            return {
+                "type": "strategy_change",
+                "data": {
+                    "strategy": target,
+                    "previous_strategy": current,
+                    "estimated_time": target_strat.estimated_time,
+                },
+                "message": (
+                    f"Switching to **{target}** strategy "
+                    f"(estimated time: {target_strat.estimated_time:.0f}s). "
+                    f"The cost and time panels will update accordingly.\n\n"
+                    f"*Previous strategy: {current}*"
+                ),
+            }
+        # Target strategy not found in plan
+        available = ", ".join(s.name for s in ctx.strategies) or "none available"
+        return {
+            "type": "conversation",
+            "data": None,
+            "message": (
+                f"Strategy **{target}** is not available for this plan. "
+                f"Available strategies: {available}."
+            ),
+        }
+
     if qtype == ConversationalQueryType.GENERAL:
         result = handle_general_query(user_message, ctx)
-        return {"type": "general_query", "data": result}
+        # Extract the natural-language message from the handler
+        msg = result.pop("message", "") if result else ""
+        return {"type": "general_query", "data": result, "message": msg}
 
     if qtype == ConversationalQueryType.EXPLAIN_FEATURE:
         fid = meta["feature_id"]
@@ -324,10 +434,13 @@ async def handle_conversational_query(
     if answer.is_modification_request:
         return {
             "type": "modification_redirect",
-            "data": {"original_message": user_message},
+            "data": {
+                "original_message": user_message,
+                "plan_id": ctx.plan_id,
+            },
             "message": (
-                "This looks like a plan modification request. "
-                "Routing to the refinement engine..."
+                "I'll apply this modification to your plan. "
+                "Analyzing the requested changes..."
             ),
         }
 

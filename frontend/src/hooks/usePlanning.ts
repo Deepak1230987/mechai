@@ -14,8 +14,9 @@ import {
     getCostBreakdown,
     getTimeBreakdown,
     getSpatialMap,
+    getNarrative,
 } from "@/lib/intelligence-api";
-import type { VersionInfo } from "@/types/intelligence";
+import type { VersionInfo, ConversationMessage } from "@/types/intelligence";
 
 export function usePlanning(modelId: string | undefined) {
     const {
@@ -29,6 +30,8 @@ export function usePlanning(modelId: string | undefined) {
         setProcessingStage,
         setError,
         plan,
+        addMessage,
+        conversationHistory,
     } = useWorkspaceStore();
 
     const loadedRef = useRef(false);
@@ -65,12 +68,13 @@ export function usePlanning(modelId: string | undefined) {
     // ── Helper: fetch intelligence data in parallel ──────────────────────
     const loadIntelligence = useCallback(
         async (id: string) => {
-            const [costRes, timeRes, spatialRes, versionsRes] =
+            const [costRes, timeRes, spatialRes, versionsRes, narrativeRes] =
                 await Promise.allSettled([
                     getCostBreakdown(id),
                     getTimeBreakdown(id),
                     getSpatialMap(id),
                     apiListVersions(id),
+                    getNarrative(id),
                 ]);
 
             if (costRes.status === "fulfilled") setCost(costRes.value.data);
@@ -80,8 +84,27 @@ export function usePlanning(modelId: string | undefined) {
             if (versionsRes.status === "fulfilled") {
                 setVersionHistory(versionsRes.value as VersionInfo[]);
             }
+
+            // Inject initial narrative as first AI message (only if chat is empty)
+            if (
+                narrativeRes.status === "fulfilled" &&
+                narrativeRes.value.message
+            ) {
+                const currentHistory = useWorkspaceStore.getState().conversationHistory;
+                if (currentHistory.length === 0) {
+                    const narrativeMsg: ConversationMessage = {
+                        id: "initial-narrative",
+                        role: "assistant",
+                        content: narrativeRes.value.message,
+                        timestamp: new Date().toISOString(),
+                        type: "initial_narrative",
+                        data: narrativeRes.value.data,
+                    };
+                    addMessage(narrativeMsg);
+                }
+            }
         },
-        [setCost, setTime, setSpatialMap, setVersionHistory],
+        [setCost, setTime, setSpatialMap, setVersionHistory, addMessage],
     );
 
     // ── Main loader ──────────────────────────────────────────────────────

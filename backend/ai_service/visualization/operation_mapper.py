@@ -123,17 +123,24 @@ def map_operations_spatial(ctx: ConversationContext) -> SpatialOperationMap:
 
     # ── Map each operation ───────────────────────────────────────────────
     spatial_ops: list[SpatialOperation] = []
+    op_count = len(ctx.operations)
 
-    for op in ctx.operations:
+    for op_idx, op in enumerate(ctx.operations):
         feature = feature_map.get(op.feature_id, {})
         setup_id = op_to_setup.get(op.id)
         orientation = setup_orient.get(setup_id, "TOP") if setup_id else "TOP"
         tool_axis = _ORIENTATION_TO_AXIS.get(orientation, "Z-")
 
-        # Extract spatial from feature
-        centroid = _compute_centroid(feature)
-        bb = _compute_feature_bbox(feature)
-        depth = _compute_depth(feature, op)
+        # Extract spatial from feature — with fallback to part bbox + op params
+        if feature and _has_spatial_data(feature):
+            centroid = _compute_centroid(feature)
+            bb = _compute_feature_bbox(feature)
+            depth = _compute_depth(feature, op)
+        else:
+            # Derive spatial data from operation type, params, and part bbox
+            centroid, bb, depth = _derive_spatial_from_operation(
+                op, part_bb, orientation, op_idx, op_count,
+            )
 
         # Tool info
         tool = tool_map.get(op.tool_id)
@@ -191,7 +198,7 @@ def _extract_part_bbox(geometry_summary: dict) -> BoundingBox3D:
     if not bbox:
         return BoundingBox3D()
 
-    # Handle both formats: {min: [x,y,z], max: [x,y,z]} and {dx, dy, dz}
+    # Format 1: {min: [x,y,z], max: [x,y,z]}
     if "min" in bbox and "max" in bbox:
         mn = bbox["min"]
         mx = bbox["max"]
@@ -202,6 +209,18 @@ def _extract_part_bbox(geometry_summary: dict) -> BoundingBox3D:
                 z_min=mn[2], z_max=mx[2],
             )
 
+    # Format 2: {length, width, height} — from intelligence report
+    if "length" in bbox:
+        length = float(bbox.get("length", 0))
+        width = float(bbox.get("width", 0))
+        height = float(bbox.get("height", 0))
+        return BoundingBox3D(
+            x_min=0, x_max=length,
+            y_min=0, y_max=width,
+            z_min=0, z_max=height,
+        )
+
+    # Format 3: {dx, dy, dz}
     dx = bbox.get("dx", 0)
     dy = bbox.get("dy", 0)
     dz = bbox.get("dz", 0)
@@ -307,3 +326,147 @@ def _compute_depth(feature: dict, op) -> float:
     # From feature dimensions
     dims = feature.get("dimensions", {})
     return float(dims.get("depth", 0))
+
+
+def _has_spatial_data(feature: dict) -> bool:
+    """Check if a feature has enough data to derive spatial coordinates."""
+    if feature.get("centroid") or feature.get("position"):
+        return True
+    bbox = feature.get("bounding_box", {})
+    if bbox and ("min" in bbox or "x_min" in bbox):
+        return True
+    dims = feature.get("dimensions", {})
+    if dims and (dims.get("diameter") or dims.get("width") or dims.get("length")):
+        return True
+    return False
+
+
+def _derive_spatial_from_operation(
+    op,
+    part_bb: BoundingBox3D,
+    orientation: str,
+    op_idx: int,
+    op_count: int,
+) -> tuple[dict, BoundingBox3D, float]:
+    """
+    Derive spatial data from operation type & parameters when the
+    feature itself has no spatial data (e.g. synthetic features).
+
+    Distributes operations across the part bounding box so each gets
+    a distinct visual region.
+    """
+    params = op.parameters or {}
+    op_type = op.type.upper()
+
+    px = part_bb.x_max - part_bb.x_min  # part length (X)
+    py = part_bb.y_max - part_bb.y_min  # part width  (Y)
+    pz = part_bb.z_max - part_bb.z_min  # part height (Z)
+
+    # Default depth from params
+    depth = float(params.get("depth", pz))
+
+    # ── FACE_MILLING: full top surface ────────────────────────────────
+    if op_type == "FACE_MILLING":
+        # Use the full top face with a small inset for visual clarity
+        inset = min(px, py) * 0.05
+        bb = BoundingBox3D(
+            x_min=part_bb.x_min + inset,
+            x_max=part_bb.x_max - inset,
+            y_min=part_bb.y_min + inset,
+            y_max=part_bb.y_max - inset,
+            z_min=part_bb.z_max - depth * 0.6,  # doc_pct
+            z_max=part_bb.z_max,
+        )
+        centroid = {
+            "x": (bb.x_min + bb.x_max) / 2,
+            "y": (bb.y_min + bb.y_max) / 2,
+            "z": part_bb.z_max,
+        }
+        return centroid, bb, depth
+
+    # ── POCKET_ROUGHING / POCKET_FINISHING: interior region ───────────
+    if "POCKET" in op_type:
+        margin = min(px, py) * 0.15
+        bb = BoundingBox3D(
+            x_min=part_bb.x_min + margin,
+            x_max=part_bb.x_max - margin,
+            y_min=part_bb.y_min + margin,
+            y_max=part_bb.y_max - margin,
+            z_min=part_bb.z_max - depth,
+            z_max=part_bb.z_max - depth * 0.1,
+        )
+        centroid = {
+            "x": (bb.x_min + bb.x_max) / 2,
+            "y": (bb.y_min + bb.y_max) / 2,
+            "z": part_bb.z_max - depth / 2,
+        }
+        return centroid, bb, depth
+
+    # ── FINISH_CONTOUR / SLOT_MILLING: perimeter region ──────────────
+    if "CONTOUR" in op_type or "SLOT" in op_type:
+        wall = min(px, py) * 0.12
+        bb = BoundingBox3D(
+            x_min=part_bb.x_min,
+            x_max=part_bb.x_max,
+            y_min=part_bb.y_min,
+            y_max=part_bb.y_max,
+            z_min=part_bb.z_min,
+            z_max=part_bb.z_max,
+        )
+        # Centroid on the contour edge (front face)
+        centroid = {
+            "x": part_bb.x_min + px / 2,
+            "y": part_bb.y_min,
+            "z": part_bb.z_min + pz / 2,
+        }
+        return centroid, bb, depth
+
+    # ── DRILLING: cylindrical region at varied positions ──────────────
+    if "DRILL" in op_type:
+        # Spread drill operations across the part
+        fraction = (op_idx + 0.5) / max(op_count, 1)
+        diameter = float(params.get("diameter", min(px, py) * 0.1))
+        r = diameter / 2
+        cx = part_bb.x_min + px * fraction
+        cy = part_bb.y_min + py / 2
+        bb = BoundingBox3D(
+            x_min=cx - r, x_max=cx + r,
+            y_min=cy - r, y_max=cy + r,
+            z_min=part_bb.z_max - depth,
+            z_max=part_bb.z_max,
+        )
+        centroid = {"x": cx, "y": cy, "z": part_bb.z_max}
+        return centroid, bb, depth
+
+    # ── TURNING operations: cylindrical envelope ─────────────────────
+    if "TURN" in op_type:
+        bb = BoundingBox3D(
+            x_min=part_bb.x_min,
+            x_max=part_bb.x_max,
+            y_min=part_bb.y_min + py * 0.1,
+            y_max=part_bb.y_max - py * 0.1,
+            z_min=part_bb.z_min,
+            z_max=part_bb.z_max,
+        )
+        centroid = {
+            "x": (part_bb.x_min + part_bb.x_max) / 2,
+            "y": (part_bb.y_min + part_bb.y_max) / 2,
+            "z": (part_bb.z_min + part_bb.z_max) / 2,
+        }
+        return centroid, bb, depth
+
+    # ── Generic fallback: subdivide part along X for each operation ───
+    segment_len = px / max(op_count, 1)
+    x_start = part_bb.x_min + segment_len * op_idx
+    x_end = x_start + segment_len
+    bb = BoundingBox3D(
+        x_min=x_start, x_max=x_end,
+        y_min=part_bb.y_min, y_max=part_bb.y_max,
+        z_min=part_bb.z_max - depth, z_max=part_bb.z_max,
+    )
+    centroid = {
+        "x": (x_start + x_end) / 2,
+        "y": (part_bb.y_min + part_bb.y_max) / 2,
+        "z": part_bb.z_max,
+    }
+    return centroid, bb, depth

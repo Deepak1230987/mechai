@@ -59,6 +59,7 @@ class ConversationContext(BaseModel):
     plan_id: str | None = None
     version: int = 1
     selected_strategy: str = "CONSERVATIVE"
+    part_name: str = ""  # human-readable model/file name
 
     # ── Geometry ─────────────────────────────────────────────────────────
     material: str = ""

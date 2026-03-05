@@ -1,9 +1,12 @@
 /**
  * MessageBubble — renders a single user or assistant chat message.
+ * Assistant messages are rendered as Markdown via react-markdown.
  */
 
 import { cn } from "@/lib/utils";
 import { Bot, User } from "lucide-react";
+import ReactMarkdown from "react-markdown";
+import remarkGfm from "remark-gfm";
 import type { ConversationMessage } from "@/types/intelligence";
 
 interface MessageBubbleProps {
@@ -43,8 +46,15 @@ export function MessageBubble({ message }: MessageBubbleProps) {
             : "bg-muted text-foreground rounded-bl-sm",
         )}
       >
-        {/* Render content — for now as text, could extend with markdown */}
-        <p className="whitespace-pre-wrap break-words">{message.content}</p>
+        {isUser ? (
+          <p className="whitespace-pre-wrap break-words">{message.content}</p>
+        ) : (
+          <div className="prose prose-sm dark:prose-invert max-w-none break-words [&>*:first-child]:mt-0 [&>*:last-child]:mb-0 [&_p]:my-1.5 [&_ul]:my-1.5 [&_ol]:my-1.5 [&_li]:my-0.5 [&_h2]:text-sm [&_h2]:font-semibold [&_h2]:mt-3 [&_h2]:mb-1.5 [&_h3]:text-xs [&_h3]:font-semibold [&_h3]:mt-2 [&_h3]:mb-1 [&_code]:text-[11px] [&_code]:bg-background/50 [&_code]:px-1 [&_code]:py-0.5 [&_code]:rounded [&_hr]:my-2">
+            <ReactMarkdown remarkPlugins={[remarkGfm]}>
+              {message.content}
+            </ReactMarkdown>
+          </div>
+        )}
 
         {/* Timestamp */}
         <p

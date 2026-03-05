@@ -42,7 +42,8 @@ export type OperationType =
     | "SLOT_MILLING"
     | "ROUGH_TURNING"
     | "FINISH_TURNING"
-    | "FACE_MILLING";
+    | "FACE_MILLING"
+    | "FINISH_CONTOUR";
 
 export interface Setup {
     setup_id: string;

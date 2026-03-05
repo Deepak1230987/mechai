@@ -8,7 +8,7 @@ falls back to deterministic templates.
 Rules:
   • Never invent geometry.  All dimensions come from ConversationContext.
   • Always reference feature IDs and operation IDs.
-  • No plan modifications.
+#   • No plan modifications.
 """
 
 from __future__ import annotations

@@ -1,9 +1,15 @@
 /**
  * ThreeDViewer — enhanced 3D viewer with operation highlighting,
  * setup orientation, tool axis visualization, and bounding boxes.
+ *
+ * Coordinate transformation:
+ *   The glTF model is normalized to fit within a ~2-unit cube centered at origin.
+ *   Spatial coordinates from the backend are in model-space (mm).
+ *   We store the normalization transform (scale + offset) and apply it
+ *   to spatial data so highlights align perfectly with the mesh.
  */
 
-import { useEffect, useRef, useCallback, useState } from "react";
+import { useEffect, useRef, useCallback, useState, useMemo } from "react";
 import * as THREE from "three";
 import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
 import { OrbitControls } from "three/addons/controls/OrbitControls.js";
@@ -15,10 +21,18 @@ import { Badge } from "@/components/ui/badge";
 const BG_COLOR = 0x0f172a;
 const GRID_COLOR1 = 0x334155;
 const GRID_COLOR2 = 0x1e293b;
-const HIGHLIGHT_COLOR = 0x2563eb;
-const DIM_OPACITY = 0.15;
+const HIGHLIGHT_FILL_COLOR = 0x2563eb;
+const HIGHLIGHT_WIRE_COLOR = 0x60a5fa;
+const DIM_OPACITY = 0.18;
 const TOOL_AXIS_COLOR = 0x14b8a6;
 const BBOX_COLOR = 0xf59e0b;
+const CENTROID_COLOR = 0xef4444;
+
+/** Stored normalization: viewer_coord = (model_mm * scale) + offset */
+interface ModelTransform {
+  scale: number;
+  offset: THREE.Vector3;
+}
 
 export function ThreeDViewer() {
   const containerRef = useRef<HTMLDivElement>(null);
@@ -29,15 +43,56 @@ export function ThreeDViewer() {
   const modelRef = useRef<THREE.Group | null>(null);
   const highlightGroupRef = useRef<THREE.Group>(new THREE.Group());
   const animFrameRef = useRef<number>(0);
+  const transformRef = useRef<ModelTransform | null>(null);
 
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState("");
-  const [currentSetup, setCurrentSetup] = useState(0);
 
-  const { gltfUrl, selectedOperationId, spatialMap, plan } =
-    useWorkspaceStore();
+  const {
+    gltfUrl,
+    selectedOperationId,
+    spatialMap,
+    plan,
+    selectedSetupIndex,
+    selectSetup,
+  } = useWorkspaceStore();
 
   const setupCount = plan?.setups?.length ?? 1;
+
+  // Current setup orientation from plan
+  const currentSetupOrientation = useMemo(() => {
+    if (!plan?.setups?.[selectedSetupIndex]) return "TOP";
+    return plan.setups[selectedSetupIndex].orientation ?? "TOP";
+  }, [plan?.setups, selectedSetupIndex]);
+
+  // ── Coordinate transform helper ──────────────────────────────────────
+  // Maps from model-space mm coords to viewer-space coords.
+  // CAD typically uses Z-up; Three.js uses Y-up, so we swap Y↔Z.
+  const toViewerCoord = useCallback(
+    (modelX: number, modelY: number, modelZ: number): THREE.Vector3 => {
+      const t = transformRef.current;
+      if (!t) return new THREE.Vector3(0, 0, 0);
+      return new THREE.Vector3(
+        modelX * t.scale + t.offset.x,
+        modelZ * t.scale + t.offset.y,
+        modelY * t.scale + t.offset.z,
+      );
+    },
+    [],
+  );
+
+  const toViewerSize = useCallback(
+    (sizeX: number, sizeY: number, sizeZ: number): THREE.Vector3 => {
+      const t = transformRef.current;
+      if (!t) return new THREE.Vector3(0.2, 0.2, 0.2);
+      return new THREE.Vector3(
+        Math.max(Math.abs(sizeX * t.scale), 0.02),
+        Math.max(Math.abs(sizeZ * t.scale), 0.02),
+        Math.max(Math.abs(sizeY * t.scale), 0.02),
+      );
+    },
+    [],
+  );
 
   // ── Scene setup ──────────────────────────────────────────────────────
   useEffect(() => {
@@ -158,6 +213,12 @@ export function ThreeDViewer() {
         model.scale.setScalar(scale);
         model.position.sub(center.multiplyScalar(scale));
 
+        // Store the normalization transform for spatial coordinate mapping
+        transformRef.current = {
+          scale,
+          offset: model.position.clone(),
+        };
+
         sceneRef.current!.add(model);
         modelRef.current = model;
 
@@ -206,106 +267,163 @@ export function ThreeDViewer() {
     );
     if (!spatialOp) return;
 
-    // Bounding box wireframe
     const bb = spatialOp.bounding_box;
-    const size = new THREE.Vector3(
-      Math.max(bb.x_max - bb.x_min, 0.2),
-      Math.max(bb.y_max - bb.y_min, 0.2),
-      Math.max(bb.z_max - bb.z_min, 0.2),
+    const sizeX = Math.max(bb.x_max - bb.x_min, 0.5);
+    const sizeY = Math.max(bb.y_max - bb.y_min, 0.5);
+    const sizeZ = Math.max(bb.z_max - bb.z_min, 0.5);
+    const centerX = (bb.x_min + bb.x_max) / 2;
+    const centerY = (bb.y_min + bb.y_max) / 2;
+    const centerZ = (bb.z_min + bb.z_max) / 2;
+
+    // Convert to viewer coordinates
+    const viewerCenter = toViewerCoord(centerX, centerY, centerZ);
+    const viewerSize = toViewerSize(sizeX, sizeY, sizeZ);
+
+    // Semi-transparent filled bounding box
+    const fillGeo = new THREE.BoxGeometry(
+      viewerSize.x,
+      viewerSize.y,
+      viewerSize.z,
     );
-    const bbGeo = new THREE.BoxGeometry(size.x, size.y, size.z);
-    const bbMat = new THREE.MeshBasicMaterial({
-      color: BBOX_COLOR,
+    const fillMat = new THREE.MeshBasicMaterial({
+      color: HIGHLIGHT_FILL_COLOR,
+      transparent: true,
+      opacity: 0.15,
+      depthWrite: false,
+      side: THREE.DoubleSide,
+    });
+    const fillMesh = new THREE.Mesh(fillGeo, fillMat);
+    fillMesh.position.copy(viewerCenter);
+    hGroup.add(fillMesh);
+
+    // Wireframe overlay
+    const wireGeo = new THREE.BoxGeometry(
+      viewerSize.x,
+      viewerSize.y,
+      viewerSize.z,
+    );
+    const wireMat = new THREE.MeshBasicMaterial({
+      color: HIGHLIGHT_WIRE_COLOR,
       wireframe: true,
       transparent: true,
-      opacity: 0.6,
+      opacity: 0.5,
     });
-    const bbMesh = new THREE.Mesh(bbGeo, bbMat);
-    bbMesh.position.set(
-      spatialOp.centroid.x,
-      spatialOp.centroid.y,
-      spatialOp.centroid.z,
-    );
-    hGroup.add(bbMesh);
+    const wireMesh = new THREE.Mesh(wireGeo, wireMat);
+    wireMesh.position.copy(viewerCenter);
+    hGroup.add(wireMesh);
 
-    // Highlight sphere at centroid
-    const sphereGeo = new THREE.SphereGeometry(0.08, 16, 16);
-    const sphereMat = new THREE.MeshBasicMaterial({
-      color: HIGHLIGHT_COLOR,
+    // Bright edge lines
+    const edgesGeo = new THREE.EdgesGeometry(fillGeo);
+    const edgesMat = new THREE.LineBasicMaterial({
+      color: BBOX_COLOR,
       transparent: true,
-      opacity: 0.8,
+      opacity: 0.9,
+    });
+    const edgesLine = new THREE.LineSegments(edgesGeo, edgesMat);
+    edgesLine.position.copy(viewerCenter);
+    hGroup.add(edgesLine);
+
+    // Centroid indicator sphere
+    const centroid = spatialOp.centroid;
+    const viewerCentroid = toViewerCoord(centroid.x, centroid.y, centroid.z);
+    const sphereGeo = new THREE.SphereGeometry(0.04, 16, 16);
+    const sphereMat = new THREE.MeshBasicMaterial({
+      color: CENTROID_COLOR,
+      transparent: true,
+      opacity: 0.9,
     });
     const sphere = new THREE.Mesh(sphereGeo, sphereMat);
-    sphere.position.copy(bbMesh.position);
+    sphere.position.copy(viewerCentroid);
     hGroup.add(sphere);
 
-    // Tool axis line
+    // Tool axis arrow
     const axisMap: Record<string, THREE.Vector3> = {
-      "Z-": new THREE.Vector3(0, 0, -1),
-      "Z+": new THREE.Vector3(0, 0, 1),
-      "Y-": new THREE.Vector3(0, -1, 0),
-      "Y+": new THREE.Vector3(0, 1, 0),
+      "Z-": new THREE.Vector3(0, -1, 0),
+      "Z+": new THREE.Vector3(0, 1, 0),
+      "Y-": new THREE.Vector3(0, 0, -1),
+      "Y+": new THREE.Vector3(0, 0, 1),
       "X-": new THREE.Vector3(-1, 0, 0),
       "X+": new THREE.Vector3(1, 0, 0),
     };
-    const axisDir = axisMap[spatialOp.tool_axis] ?? new THREE.Vector3(0, 0, -1);
+    const axisDir = axisMap[spatialOp.tool_axis] ?? new THREE.Vector3(0, -1, 0);
 
-    const origin = new THREE.Vector3(
-      spatialOp.centroid.x,
-      spatialOp.centroid.y,
-      spatialOp.centroid.z,
-    );
+    const arrowOrigin = viewerCentroid
+      .clone()
+      .addScaledVector(axisDir.clone().negate(), 0.5);
     const arrowHelper = new THREE.ArrowHelper(
       axisDir,
-      origin,
-      1.0,
+      arrowOrigin,
+      0.4,
       TOOL_AXIS_COLOR,
-      0.15,
       0.08,
+      0.05,
     );
     hGroup.add(arrowHelper);
-  }, [selectedOperationId, spatialMap]);
 
-  // ── Setup rotation ───────────────────────────────────────────────────
-  const handleSetupFlip = useCallback(() => {
-    const next = (currentSetup + 1) % setupCount;
-    setCurrentSetup(next);
+    // Dashed approach line
+    const dashMat = new THREE.LineDashedMaterial({
+      color: TOOL_AXIS_COLOR,
+      dashSize: 0.03,
+      gapSize: 0.02,
+      transparent: true,
+      opacity: 0.4,
+    });
+    const lineGeo = new THREE.BufferGeometry().setFromPoints([
+      arrowOrigin.clone().addScaledVector(axisDir.clone().negate(), 0.25),
+      arrowOrigin,
+    ]);
+    const dashLine = new THREE.Line(lineGeo, dashMat);
+    dashLine.computeLineDistances();
+    hGroup.add(dashLine);
+  }, [selectedOperationId, spatialMap, toViewerCoord, toViewerSize]);
 
-    if (modelRef.current) {
-      const orientations = ["TOP", "BOTTOM", "FRONT", "BACK", "LEFT", "RIGHT"];
-      const setupOrientation =
-        plan?.setups?.[next]?.orientation ??
-        orientations[next % orientations.length];
+  // ── Setup rotation (smooth animation) ────────────────────────────────
+  useEffect(() => {
+    if (!modelRef.current) return;
 
-      const rotationMap: Record<string, [number, number, number]> = {
-        TOP: [0, 0, 0],
-        BOTTOM: [Math.PI, 0, 0],
-        FRONT: [-Math.PI / 2, 0, 0],
-        BACK: [Math.PI / 2, 0, 0],
-        LEFT: [0, 0, Math.PI / 2],
-        RIGHT: [0, 0, -Math.PI / 2],
-      };
+    const rotationMap: Record<string, [number, number, number]> = {
+      TOP: [0, 0, 0],
+      BOTTOM: [Math.PI, 0, 0],
+      FRONT: [-Math.PI / 2, 0, 0],
+      BACK: [Math.PI / 2, 0, 0],
+      LEFT: [0, 0, Math.PI / 2],
+      RIGHT: [0, 0, -Math.PI / 2],
+    };
 
-      const [rx, ry, rz] = rotationMap[setupOrientation] ?? [0, 0, 0];
+    const [rx, ry, rz] = rotationMap[currentSetupOrientation] ?? [0, 0, 0];
 
-      // Smooth rotation animation
-      const startRx = modelRef.current.rotation.x;
-      const startRy = modelRef.current.rotation.y;
-      const startRz = modelRef.current.rotation.z;
-      const duration = 600;
-      const startTime = performance.now();
+    const startRx = modelRef.current.rotation.x;
+    const startRy = modelRef.current.rotation.y;
+    const startRz = modelRef.current.rotation.z;
 
-      const animateRotation = (now: number) => {
-        const t = Math.min((now - startTime) / duration, 1);
-        const ease = t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2;
-        modelRef.current!.rotation.x = startRx + (rx - startRx) * ease;
-        modelRef.current!.rotation.y = startRy + (ry - startRy) * ease;
-        modelRef.current!.rotation.z = startRz + (rz - startRz) * ease;
-        if (t < 1) requestAnimationFrame(animateRotation);
-      };
-      requestAnimationFrame(animateRotation);
+    if (
+      Math.abs(startRx - rx) < 0.01 &&
+      Math.abs(startRy - ry) < 0.01 &&
+      Math.abs(startRz - rz) < 0.01
+    ) {
+      return;
     }
-  }, [currentSetup, setupCount, plan?.setups]);
+
+    const duration = 600;
+    const startTime = performance.now();
+    const model = modelRef.current;
+
+    const animateRotation = (now: number) => {
+      const t = Math.min((now - startTime) / duration, 1);
+      const ease = t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2;
+      model.rotation.x = startRx + (rx - startRx) * ease;
+      model.rotation.y = startRy + (ry - startRy) * ease;
+      model.rotation.z = startRz + (rz - startRz) * ease;
+      if (t < 1) requestAnimationFrame(animateRotation);
+    };
+    requestAnimationFrame(animateRotation);
+  }, [currentSetupOrientation]);
+
+  // ── Setup flip handler ───────────────────────────────────────────────
+  const handleSetupFlip = useCallback(() => {
+    const next = (selectedSetupIndex + 1) % setupCount;
+    selectSetup(next);
+  }, [selectedSetupIndex, setupCount, selectSetup]);
 
   return (
     <div className="relative h-full w-full">
@@ -314,7 +432,8 @@ export function ThreeDViewer() {
       {/* Setup badge + flip button */}
       <div className="absolute top-3 left-3 flex items-center gap-2">
         <Badge variant="secondary" className="text-[11px] font-mono">
-          Setup {currentSetup + 1}/{setupCount}
+          Setup {selectedSetupIndex + 1}/{setupCount}
+          {currentSetupOrientation !== "TOP" && ` · ${currentSetupOrientation}`}
         </Badge>
         {setupCount > 1 && (
           <Button
@@ -322,6 +441,7 @@ export function ThreeDViewer() {
             size="icon"
             className="h-7 w-7 bg-background/60 backdrop-blur-sm hover:bg-background/80"
             onClick={handleSetupFlip}
+            title="Flip to next setup orientation"
           >
             <RotateCcw className="h-3.5 w-3.5" />
           </Button>
@@ -329,18 +449,49 @@ export function ThreeDViewer() {
       </div>
 
       {/* Selected operation info */}
-      {selectedOperationId && spatialMap && (
-        <div className="absolute bottom-3 left-3 rounded-md bg-background/80 backdrop-blur-sm border border-border px-3 py-2">
-          <p className="text-[11px] text-muted-foreground">
-            Selected Operation
-          </p>
-          <p className="text-xs font-mono text-foreground">
-            {spatialMap.spatial_operations.find(
-              (op) => op.operation_id === selectedOperationId,
-            )?.operation_type ?? selectedOperationId.slice(0, 12)}
-          </p>
-        </div>
-      )}
+      {selectedOperationId &&
+        spatialMap &&
+        (() => {
+          const spatialOp = spatialMap.spatial_operations.find(
+            (op) => op.operation_id === selectedOperationId,
+          );
+          return spatialOp ? (
+            <div className="absolute bottom-3 left-3 rounded-md bg-background/80 backdrop-blur-sm border border-border px-3 py-2 max-w-[280px]">
+              <p className="text-[11px] text-muted-foreground mb-0.5">
+                Selected Operation
+              </p>
+              <p className="text-xs font-semibold text-foreground">
+                {spatialOp.operation_type}
+              </p>
+              <div className="mt-1 grid grid-cols-2 gap-x-3 gap-y-0.5 text-[10px] text-muted-foreground">
+                <span>
+                  Feature:{" "}
+                  <span className="font-mono text-foreground">
+                    {spatialOp.feature_id.slice(0, 16)}
+                  </span>
+                </span>
+                <span>
+                  Tool:{" "}
+                  <span className="font-mono text-foreground">
+                    {spatialOp.tool_axis}
+                  </span>
+                </span>
+                <span>
+                  Depth:{" "}
+                  <span className="font-mono text-foreground">
+                    {spatialOp.depth.toFixed(1)}mm
+                  </span>
+                </span>
+                <span>
+                  Time:{" "}
+                  <span className="font-mono text-foreground">
+                    {spatialOp.estimated_time.toFixed(1)}s
+                  </span>
+                </span>
+              </div>
+            </div>
+          ) : null;
+        })()}
 
       {/* Loading overlay */}
       {isLoading && (
